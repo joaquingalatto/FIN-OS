@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="FIN JOACO">
+  <rect width="180" height="180" rx="38" fill="#000000"/>
+  <rect x="1" y="1" width="178" height="178" rx="37" fill="none" stroke="#1f1f1f" stroke-width="2"/>
+  <text x="90" y="119" text-anchor="middle" fill="#ffffff" font-family="Doto, Space Mono, monospace" font-size="104" font-weight="700">F</text>
+</svg>
