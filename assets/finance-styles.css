@@ -923,12 +923,15 @@ button:disabled {
 
 @media (max-width: 640px) {
   :root {
-    --gutter: 14px;
+    --gutter: 12px;
   }
 
   .topbar {
     align-items: start;
     display: grid;
+    gap: 12px;
+    min-height: auto;
+    padding: 14px var(--gutter) 12px;
   }
 
   .topbar-brand strong {
@@ -937,23 +940,42 @@ button:disabled {
 
   .topbar-actions {
     width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(104px, 0.72fr) auto;
+    align-items: center;
+    gap: 8px;
     justify-content: space-between;
   }
 
   .segmented {
-    flex: 1;
+    width: 100%;
+    min-height: 42px;
   }
 
-  .select-wrap {
-    flex: 1;
+  .segmented button {
+    min-width: 0;
+    padding: 0 10px;
   }
 
   .select-wrap select {
     width: 100%;
+    min-height: 42px;
+    padding: 0 30px 0 14px;
   }
 
   .hero-metric {
     min-height: 280px;
+    padding: 20px;
+  }
+
+  .hero-meta {
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .chip {
+    min-height: 28px;
+    padding: 3px 10px;
   }
 
   .metrics-grid,
@@ -982,11 +1004,17 @@ button:disabled {
   }
 
   .btn {
-    padding: 0 14px;
+    padding: 0 13px;
   }
 
   .hero-actions-compact {
     display: grid;
+    justify-items: start;
+  }
+
+  .hero-actions-compact .btn {
+    width: min(100%, 320px);
+    min-height: 46px;
   }
 }
 
