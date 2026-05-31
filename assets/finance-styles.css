@@ -254,6 +254,15 @@ button:disabled {
   gap: 10px;
 }
 
+.user-mark {
+  color: var(--text-display);
+  font-family: "Space Mono", monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .content {
   width: min(1440px, 100%);
   margin: 0 auto;
@@ -1027,6 +1036,13 @@ button:disabled {
     width: 100%;
     min-height: 42px;
     padding: 0 30px 0 14px;
+  }
+
+  .user-mark {
+    position: absolute;
+    top: 24px;
+    right: var(--gutter);
+    font-size: 11px;
   }
 
   .hero-metric {

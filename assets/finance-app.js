@@ -148,6 +148,7 @@ function appChrome(metrics) {
             <label class="select-wrap label" aria-label="Tipo de dolar">
               <select data-action="rateType">${optionList(EXCHANGE_RATE_TYPES.map((item) => ({ value: item.id, label: item.label })), state.settings.defaultExchangeRateType)}</select>
             </label>
+            <span class="user-mark">joaco</span>
             <button class="btn btn-secondary" data-action="openSetup" type="button">Configurar mes</button>
             <button class="btn btn-primary" data-action="openAdd" type="button">Agregar gasto</button>
           </div>
