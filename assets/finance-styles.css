@@ -553,6 +553,72 @@ button:disabled {
 .bar-track.is-warn i.is-filled { background: var(--warning); }
 .bar-track.is-bad i.is-filled { background: var(--accent); }
 
+.goal-distribution {
+  display: flex;
+  gap: 3px;
+  min-height: 14px;
+  margin-bottom: 14px;
+}
+
+.goal-slice {
+  flex: var(--size) 1 0;
+  min-width: 4px;
+  background: var(--border-visible);
+}
+
+.goal-slice.is-good { background: var(--success); }
+.goal-slice.is-warn { background: var(--warning); }
+.goal-slice.is-bad { background: var(--accent); }
+
+.goal-compact-list,
+.goal-table {
+  display: grid;
+  gap: 10px;
+}
+
+.goal-compact-row,
+.goal-row {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 0;
+}
+
+.goal-compact-row {
+  grid-template-columns: 1fr auto;
+}
+
+.goal-compact-row small {
+  color: var(--text-secondary);
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+}
+
+.goal-row {
+  grid-template-columns: 1.05fr 1fr 1fr 1fr auto;
+}
+
+.goal-row strong {
+  color: var(--text-display);
+  font-weight: 400;
+}
+
+.goal-table + .insight-card {
+  margin-top: 14px;
+}
+
+.goal-rules-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.goal-rules-form .btn {
+  align-self: end;
+}
+
 .transaction-list,
 .line-list {
   display: grid;
@@ -986,7 +1052,9 @@ button:disabled {
   }
 
   .transaction-item,
-  .line-item {
+  .line-item,
+  .goal-row,
+  .goal-rules-form {
     grid-template-columns: 1fr;
     gap: 8px;
   }

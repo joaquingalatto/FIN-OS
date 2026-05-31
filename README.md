@@ -38,8 +38,10 @@ No muestra gastos, ingresos, presupuestos ni inversiones ficticias como estado i
 - Subcategorias de comida para diferenciar supermercado grande, diario, delivery y otros.
 - Categorias y gastos recurrentes.
 - Presupuestos variables.
+- Sistema de objetivos porcentuales segun ingreso mensual.
 - Objetivo de ahorro automatico del 40% del sueldo mensual.
-- Presupuestos sugeridos para comida y ocio usando la bolsa variable restante.
+- Porcentajes editables para ahorro, casa, tarjeta, ocio, gastos hormiga y margen.
+- Distribucion del sueldo con montos recomendados y reales.
 - Aviso cuando alquiler, expensas y servicios superan el 30% recomendado del ingreso.
 - Toggle ARS/USD.
 - Cotizacion de dolar oficial, blue y MEP via DolarApi con fallback local.

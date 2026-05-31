@@ -4,6 +4,7 @@ import {
   FOOD_SUBCATEGORIES,
   PAYMENT_METHODS,
   defaultCreditCardSettings,
+  defaultMonthlyGoalRules,
   emptySavings,
   fallbackExchangeRates,
   mockSettings,
@@ -35,10 +36,6 @@ const TYPE_LABELS = {
   investment: "Inversion",
 };
 
-const SAVINGS_RATIO = 0.4;
-const FOOD_BUDGET_RATIO = 0.75;
-const LEISURE_BUDGET_RATIO = 0.25;
-
 let state = {
   activeView: "dashboard",
   modalOpen: false,
@@ -50,7 +47,7 @@ let state = {
   ratesMessage: "Cotizacion en carga",
   modalType: "expense",
   rates: fallbackExchangeRates,
-  settings: mockSettings,
+  settings: { ...mockSettings, monthlyGoalRules: defaultMonthlyGoalRules },
   transactions: [],
   budgets: [],
   savings: emptySavings,
@@ -66,7 +63,7 @@ function hydrate() {
     state = {
       ...state,
       ...saved,
-      settings: { ...mockSettings, ...(saved.settings || {}) },
+      settings: { ...mockSettings, ...(saved.settings || {}), monthlyGoalRules: { ...defaultMonthlyGoalRules, ...(saved.settings?.monthlyGoalRules || {}) } },
       savings: { ...emptySavings, ...(saved.savings || {}) },
       creditCardSettings: { ...defaultCreditCardSettings, ...(saved.creditCardSettings || {}) },
       installmentPurchases: saved.installmentPurchases || [],
@@ -241,6 +238,7 @@ function dashboardView(metrics, insights) {
           ${metricCard("Gasto fijo", metrics.fixedExpenseARS)}
           ${metricCard("Gasto variable", metrics.variableExpenseARS)}
         </div>
+        ${monthlyGoalsDashboardCard(metrics)}
         ${isZeroState ? zeroStartPanel() : ""}
         ${chartCard(metrics)}
       </div>
@@ -253,6 +251,103 @@ function dashboardView(metrics, insights) {
       </aside>
     </div>
   `;
+}
+
+function percentText(value) {
+  const number = Number.isFinite(value) ? value : 0;
+  return `${number.toFixed(number % 1 ? 1 : 0)}%`;
+}
+
+function goalStatusChip(status) {
+  return `<span class="chip"><span class="dot ${status.tone}"></span>${escapeHtml(status.label)}</span>`;
+}
+
+function monthlyGoalRows(goals, includeUnassigned = false) {
+  const recommendedSafety = (goals.income * goals.safetyMarginPercentage) / 100;
+  const rows = [
+    {
+      id: "savings",
+      label: "Ahorro",
+      targetPercentage: goals.savingsTargetPercentage,
+      recommended: (goals.income * goals.savingsTargetPercentage) / 100,
+      actual: goals.savingsTargetAmount,
+      status: goals.statuses.savings,
+    },
+    {
+      id: "houseAndServices",
+      label: "Casa y servicios",
+      targetPercentage: goals.houseAndServicesMaxPercentage,
+      recommended: goals.houseAndServicesMaxAmount,
+      actual: goals.houseAndServicesActualAmount,
+      status: goals.statuses.houseAndServices,
+    },
+    {
+      id: "creditCard",
+      label: "Tarjeta",
+      targetPercentage: goals.creditCardTargetPercentage,
+      recommended: (goals.income * goals.creditCardTargetPercentage) / 100,
+      actual: goals.creditCardActualAmount,
+      status: goals.statuses.creditCard,
+    },
+    {
+      id: "leisure",
+      label: "Ocio",
+      targetPercentage: goals.leisureTargetPercentage,
+      recommended: goals.leisureTargetAmount,
+      actual: goals.leisureActualAmount,
+      status: goals.statuses.leisure,
+    },
+    {
+      id: "smallExpenses",
+      label: "Gastos hormiga",
+      targetPercentage: goals.smallExpensesTargetPercentage,
+      recommended: goals.smallExpensesTargetAmount,
+      actual: goals.smallExpensesActualAmount,
+      status: goals.statuses.smallExpenses,
+    },
+    {
+      id: "safetyMargin",
+      label: "Margen",
+      targetPercentage: goals.safetyMarginPercentage,
+      recommended: recommendedSafety,
+      actual: goals.safetyMarginAmount,
+      status: goals.statuses.safetyMargin,
+    },
+  ];
+  if (includeUnassigned && goals.remainingUnassignedAmount > 0) {
+    rows.push({
+      id: "unassigned",
+      label: "Sin asignar",
+      targetPercentage: 0,
+      recommended: 0,
+      actual: goals.remainingUnassignedAmount,
+      status: { id: "ok", label: "Disponible", tone: "neutral" },
+    });
+  }
+  return rows;
+}
+
+function monthlyGoalsDashboardCard(metrics) {
+  const goals = metrics.monthlyGoals;
+  if (!goals.income) {
+    return `<section class="panel">
+      <div class="panel-head"><div><h2>Objetivos del mes</h2><p>Carga tu ingreso mensual para calcular tus objetivos del mes.</p></div></div>
+      ${emptyState("Objetivos en cero", "Cuando configures el mes, la app calcula ahorro, casa, tarjeta, ocio, gastos hormiga y margen.")}
+    </section>`;
+  }
+  const rows = monthlyGoalRows(goals, true);
+  return `<section class="panel">
+    <div class="panel-head"><div><h2>Distribucion del sueldo</h2><p>Reglas porcentuales sobre el ingreso mensual.</p></div><span class="chip">Ingreso <strong>${moneyARS(goals.income)}</strong></span></div>
+    <div class="goal-distribution" aria-label="Distribucion del sueldo">
+      ${rows.map((row) => `<span style="--size:${Math.max(2, Math.min(100, (row.actual / goals.income) * 100))}" class="goal-slice is-${row.status.tone}" title="${escapeHtml(row.label)}"></span>`).join("")}
+    </div>
+    <div class="goal-compact-list">
+      ${rows.map((row) => `<div class="goal-compact-row">
+        <span>${escapeHtml(row.label)} <small>${percentText(row.targetPercentage)}</small></span>
+        <strong class="mono">${moneyARS(row.actual || row.recommended)}</strong>
+      </div>`).join("")}
+    </div>
+  </section>`;
 }
 
 function creditCardDashboardCard(metrics) {
@@ -565,6 +660,7 @@ function investmentCard(item) {
 
 function budgetsView(metrics) {
   return `<div class="section-stack">
+    ${monthlyGoalsDetailPanel(metrics)}
     <section class="panel">
       <div class="panel-head"><div><h2>Presupuestos</h2><p>Disponible, usado, excedido y proyeccion de cierre.</p></div></div>
       <div class="grid two-grid">
@@ -572,6 +668,49 @@ function budgetsView(metrics) {
       </div>
     </section>
   </div>`;
+}
+
+function monthlyGoalsDetailPanel(metrics) {
+  const goals = metrics.monthlyGoals;
+  if (!goals.income) {
+    return `<section class="panel">
+      <div class="panel-head"><div><h2>Objetivos del mes</h2><p>Carga tu ingreso mensual para calcular tus objetivos del mes.</p></div></div>
+      ${emptyState("Sin ingreso mensual", "Todos los objetivos se mantienen en $0 hasta que configures el mes.")}
+    </section>`;
+  }
+  const rows = monthlyGoalRows(goals, true);
+  return `<section class="panel">
+    <div class="panel-head"><div><h2>Objetivos del mes</h2><p>Porcentajes como regla base, montos como resultado dinamico.</p></div><span class="chip">Ingreso <strong>${moneyARS(goals.income)}</strong></span></div>
+    <div class="goal-table">
+      ${rows.map((row) => {
+        const difference = row.actual - row.recommended;
+        const realPercentage = goals.income ? (row.actual / goals.income) * 100 : 0;
+        return `<article class="goal-row">
+          <div><span class="label">${escapeHtml(row.label)}</span><strong>${percentText(row.targetPercentage)}</strong></div>
+          <div><span class="muted">Recomendado</span><strong class="mono">${moneyARS(row.recommended)}</strong></div>
+          <div><span class="muted">Real configurado</span><strong class="mono">${moneyARS(row.actual)}</strong><small class="muted">${percentText(realPercentage)} real</small></div>
+          <div><span class="muted">Diferencia</span><strong class="mono ${difference > 0 && row.id !== "unassigned" ? "status-bad" : ""}">${moneyARS(difference)}</strong></div>
+          <div>${goalStatusChip(row.status)}</div>
+        </article>`;
+      }).join("")}
+    </div>
+    <article class="insight-card">
+      <span class="label">Disponible restante estimado</span>
+      <strong>${moneyARS(goals.leisureAndSmallAvailableAmount)}</strong>
+      <p class="muted">Ingreso menos ahorro objetivo, casa real y tarjeta estimada. Desde ahi se protegen ocio, gastos hormiga y margen.</p>
+    </article>
+    ${monthlyGoalAlerts(goals)}
+  </section>`;
+}
+
+function monthlyGoalAlerts(goals) {
+  const alerts = [];
+  if (goals.houseAndServicesActualPercentage > goals.houseAndServicesMaxPercentage) alerts.push("Casa y servicios supera el 30% recomendado para este mes.");
+  if (goals.creditCardActualPercentage > goals.creditCardTargetPercentage) alerts.push("Tu resumen estimado de tarjeta supera el objetivo recomendado.");
+  if (goals.leisureActualPercentage > goals.leisureTargetPercentage) alerts.push("Ocio esta por encima del objetivo recomendado.");
+  if (goals.smallExpensesActualPercentage > goals.smallExpensesTargetPercentage) alerts.push("Los gastos hormiga estan superando el margen recomendado.");
+  alerts.push(goals.savingsActualAmount >= goals.savingsTargetAmount ? "Vas bien: tu objetivo de ahorro esta protegido." : "Tu objetivo de ahorro necesita ajuste este mes.");
+  return `<div class="grid two-grid">${alerts.map((text) => `<article class="insight-card"><strong>${escapeHtml(text)}</strong></article>`).join("")}</div>`;
 }
 
 function budgetCard(budget) {
@@ -638,6 +777,7 @@ function closingView(metrics, closing) {
 }
 
 function settingsView() {
+  const rules = { ...defaultMonthlyGoalRules, ...(state.settings.monthlyGoalRules || {}) };
   return `<div class="section-stack">
     <section class="panel">
       <div class="panel-head"><div><h2>Configuracion</h2><p>Moneda, cotizacion por defecto y criterios de visualizacion.</p></div></div>
@@ -650,12 +790,31 @@ function settingsView() {
       </div>
     </section>
     <section class="panel">
+      <div class="panel-head"><div><h2>Porcentajes objetivo</h2><p>Reglas editables para recalcular presupuestos segun el ingreso mensual.</p></div></div>
+      <form id="goal-rules-form" class="goal-rules-form">
+        ${goalRuleField("savingsPercentage", "Ahorro", rules.savingsPercentage)}
+        ${goalRuleField("houseAndServicesMaxPercentage", "Casa y servicios max.", rules.houseAndServicesMaxPercentage)}
+        ${goalRuleField("creditCardTargetPercentage", "Tarjeta", rules.creditCardTargetPercentage)}
+        ${goalRuleField("leisureTargetPercentage", "Ocio", rules.leisureTargetPercentage)}
+        ${goalRuleField("smallExpensesTargetPercentage", "Gastos hormiga", rules.smallExpensesTargetPercentage)}
+        ${goalRuleField("safetyMarginPercentage", "Margen seguridad", rules.safetyMarginPercentage)}
+        <button class="btn btn-secondary" type="submit">Guardar porcentajes</button>
+      </form>
+    </section>
+    <section class="panel">
       <div class="panel-head"><div><h2>Casos borde contemplados</h2><p>Estados vacios, error de API, presupuesto excedido, sin ingresos y cotizacion desactualizada.</p></div></div>
       <div class="grid two-grid">
         ${emptyState("Estado vacio", "La UI resuelve secciones sin datos con una accion clara.")}
         ${state.ratesStatus === "error" ? errorState("Error de cotizacion", state.ratesMessage) : emptyState("Cotizacion online", "La cotizacion se actualizo correctamente.")}
       </div>
     </section>
+  </div>`;
+}
+
+function goalRuleField(name, label, value) {
+  return `<div class="field">
+    <label for="${name}">${escapeHtml(label)}</label>
+    <input id="${name}" name="${name}" type="number" inputmode="decimal" min="0" max="100" step="0.1" value="${Number(value || 0)}">
   </div>`;
 }
 
@@ -679,7 +838,7 @@ function setupModal() {
         <button class="btn btn-secondary" data-action="closeSetup" type="button">[ X ]</button>
       </div>
       <div class="modal-body">
-        <p class="muted">Carga solo datos reales. El objetivo de ahorro se fija siempre en 40% del sueldo; comida y ocio se calculan con lo que queda despues de alquiler, expensas y servicios.</p>
+        <p class="muted">Carga solo datos reales. Los objetivos se calculan como porcentajes del ingreso y podes ajustar montos si este mes lo necesita.</p>
         <div class="form-grid">
           <div class="field full"><label for="monthlyIncome">Sueldo mensual</label><input id="monthlyIncome" name="monthlyIncome" type="number" inputmode="decimal" min="0" step="0.01" required placeholder="Sueldo real del mes"></div>
           <div class="field"><label for="rent">Alquiler</label><input id="rent" name="rent" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
@@ -687,14 +846,24 @@ function setupModal() {
           <div class="field"><label for="utilities">Servicios</label><input id="utilities" name="utilities" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
         </div>
         <div class="panel nested-panel">
-          <div class="panel-head"><div><h3>Presupuestos sugeridos</h3><p>Comida usa 75% de la bolsa variable y ocio 25%. La bolsa variable es sueldo menos ahorro, alquiler, expensas y servicios.</p></div></div>
+          <div class="panel-head"><div><h3>Objetivos del mes</h3><p>Si dejas un monto vacio, se calcula automaticamente con los porcentajes configurados.</p></div></div>
           <div class="line-list">
-            <div class="line-item"><span>Objetivo de ahorro</span><strong class="mono">40% del sueldo</strong></div>
-            <div class="line-item"><span>Comida</span><strong class="mono">75% de variable</strong></div>
-            <div class="line-item"><span>Ocio</span><strong class="mono">25% de variable</strong></div>
+            <div class="line-item"><span>Ahorro objetivo</span><strong class="mono">${state.settings.monthlyGoalRules.savingsPercentage}% del ingreso</strong></div>
+            <div class="line-item"><span>Casa y servicios</span><strong class="mono">max. ${state.settings.monthlyGoalRules.houseAndServicesMaxPercentage}%</strong></div>
+            <div class="line-item"><span>Tarjeta</span><strong class="mono">${state.settings.monthlyGoalRules.creditCardTargetPercentage}% recomendado</strong></div>
+            <div class="line-item"><span>Ocio</span><strong class="mono">${state.settings.monthlyGoalRules.leisureTargetPercentage}% recomendado</strong></div>
+            <div class="line-item"><span>Gastos hormiga</span><strong class="mono">${state.settings.monthlyGoalRules.smallExpensesTargetPercentage}% recomendado</strong></div>
+            <div class="line-item"><span>Margen de seguridad</span><strong class="mono">${state.settings.monthlyGoalRules.safetyMarginPercentage}% recomendado</strong></div>
+          </div>
+          <div class="form-grid goal-override-grid">
+            <div class="field"><label for="savingsTargetAmount">Ahorro manual</label><input id="savingsTargetAmount" name="savingsTargetAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
+            <div class="field"><label for="cardTargetAmount">Tarjeta manual</label><input id="cardTargetAmount" name="cardTargetAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
+            <div class="field"><label for="leisureTargetAmount">Ocio manual</label><input id="leisureTargetAmount" name="leisureTargetAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
+            <div class="field"><label for="smallExpensesTargetAmount">Hormiga manual</label><input id="smallExpensesTargetAmount" name="smallExpensesTargetAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
+            <div class="field full"><label for="safetyMarginAmount">Margen manual</label><input id="safetyMarginAmount" name="safetyMarginAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
           </div>
         </div>
-        <div class="inline-status ${state.setupStatus.startsWith("[ERROR") ? "is-error" : ""}">${escapeHtml(state.setupStatus || "[GUIA] Ahorro: 40% del sueldo. Comida y ocio se definen automaticamente.")}</div>
+        <div class="inline-status ${state.setupStatus.startsWith("[ERROR") ? "is-error" : ""}">${escapeHtml(state.setupStatus || "[GUIA] Carga tu ingreso mensual para calcular tus objetivos del mes.")}</div>
         <button class="btn btn-primary" type="submit">Guardar configuracion</button>
       </div>
     </form>
@@ -821,6 +990,10 @@ function handleSubmit(event) {
   }
   if (event.target.id === "credit-card-settings-form") {
     handleCreditCardSettingsSubmit(event.target);
+    return;
+  }
+  if (event.target.id === "goal-rules-form") {
+    handleGoalRulesSubmit(event.target);
     return;
   }
   const form = event.target;
@@ -978,6 +1151,10 @@ function readPositiveInteger(value, fallback = 1) {
   return Number.isFinite(number) && number > 0 ? number : fallback;
 }
 
+function amountFromPercentage(income, percentage) {
+  return (Number(income || 0) * Number(percentage || 0)) / 100;
+}
+
 function normalizeCategory(value) {
   return String(value || "Otros").replace(/oseo/gi, "Ocio");
 }
@@ -1020,6 +1197,43 @@ function handleCreditCardSettingsSubmit(form) {
   };
   persist();
   render();
+}
+
+function handleGoalRulesSubmit(form) {
+  const formData = new FormData(form);
+  const nextRules = Object.keys(defaultMonthlyGoalRules).reduce((rules, key) => {
+    const value = Number(formData.get(key));
+    rules[key] = Number.isFinite(value) && value >= 0 ? value : defaultMonthlyGoalRules[key];
+    return rules;
+  }, {});
+  state.settings = {
+    ...state.settings,
+    monthlyGoalRules: nextRules,
+  };
+  if (state.settings.monthlyIncomeTarget) {
+    const leisureGoal = amountFromPercentage(state.settings.monthlyIncomeTarget, nextRules.leisureTargetPercentage);
+    const smallExpensesGoal = amountFromPercentage(state.settings.monthlyIncomeTarget, nextRules.smallExpensesTargetPercentage);
+    state.settings.monthlySavingsGoal = amountFromPercentage(state.settings.monthlyIncomeTarget, nextRules.savingsPercentage);
+    state.settings.monthlySafetyMargin = amountFromPercentage(state.settings.monthlyIncomeTarget, nextRules.safetyMarginPercentage);
+    state.budgets = upsertGoalBudgets(state.budgets, leisureGoal, smallExpensesGoal);
+    state.creditCardSettings = {
+      ...state.creditCardSettings,
+      monthlyPersonalLimit: amountFromPercentage(state.settings.monthlyIncomeTarget, nextRules.creditCardTargetPercentage),
+      currency: "ARS",
+      month: monthKeyFromDate(),
+    };
+  }
+  persist();
+  render();
+}
+
+function upsertGoalBudgets(budgets, leisureGoal, smallExpensesGoal) {
+  const withoutGoalBudgets = budgets.filter((budget) => !["Ocio", "Gastos hormiga"].includes(budget.category));
+  return [
+    ...withoutGoalBudgets,
+    { id: "bud-ocio", category: "Ocio", monthlyLimit: Math.round(leisureGoal), currency: "ARS" },
+    { id: "bud-gastos-hormiga", category: "Gastos hormiga", monthlyLimit: Math.round(smallExpensesGoal), currency: "ARS" },
+  ].filter((budget) => budget.monthlyLimit > 0);
 }
 
 function makeTransaction({ type, amount, category, description, isFixed = false, isRecurring = false }) {
@@ -1098,19 +1312,28 @@ function handleSetupSubmit(form) {
   });
 
   const homeTotal = homeItems.reduce((sum, item) => sum + item.amount, 0);
-  const suggestedSavingsGoal = income * SAVINGS_RATIO;
-  const variablePool = Math.max(income - suggestedSavingsGoal - homeTotal, 0);
+  const rules = { ...defaultMonthlyGoalRules, ...(state.settings.monthlyGoalRules || {}) };
+  const recommendedSavingsGoal = amountFromPercentage(income, rules.savingsPercentage);
+  const recommendedCardGoal = amountFromPercentage(income, rules.creditCardTargetPercentage);
+  const recommendedLeisureGoal = amountFromPercentage(income, rules.leisureTargetPercentage);
+  const recommendedSmallExpensesGoal = amountFromPercentage(income, rules.smallExpensesTargetPercentage);
+  const recommendedSafetyMargin = amountFromPercentage(income, rules.safetyMarginPercentage);
+  const suggestedSavingsGoal = readAmount(formData, "savingsTargetAmount") || recommendedSavingsGoal;
+  const cardGoal = readAmount(formData, "cardTargetAmount") || recommendedCardGoal;
+  const leisureGoal = readAmount(formData, "leisureTargetAmount") || recommendedLeisureGoal;
+  const smallExpensesGoal = readAmount(formData, "smallExpensesTargetAmount") || recommendedSmallExpensesGoal;
+  const safetyMargin = readAmount(formData, "safetyMarginAmount") || recommendedSafetyMargin;
   const configuredBudgets = [
-    {
-      id: "bud-comida-supermercado",
-      category: "Comida / Supermercado",
-      monthlyLimit: Math.round(variablePool * FOOD_BUDGET_RATIO),
-      currency: "ARS",
-    },
     {
       id: "bud-ocio",
       category: "Ocio",
-      monthlyLimit: Math.round(variablePool * LEISURE_BUDGET_RATIO),
+      monthlyLimit: Math.round(leisureGoal),
+      currency: "ARS",
+    },
+    {
+      id: "bud-gastos-hormiga",
+      category: "Gastos hormiga",
+      monthlyLimit: Math.round(smallExpensesGoal),
       currency: "ARS",
     },
   ].filter((budget) => budget.monthlyLimit > 0);
@@ -1121,7 +1344,14 @@ function handleSetupSubmit(form) {
     ...state.settings,
     monthlyIncomeTarget: income,
     monthlySavingsGoal: suggestedSavingsGoal,
+    monthlySafetyMargin: safetyMargin,
     monthConfiguredAt: new Date().toISOString(),
+  };
+  state.creditCardSettings = {
+    ...state.creditCardSettings,
+    monthlyPersonalLimit: cardGoal,
+    currency: "ARS",
+    month: monthKeyFromDate(),
   };
   state.savings = {
     ...state.savings,
@@ -1129,8 +1359,8 @@ function handleSetupSubmit(form) {
   };
 
   const homeRatio = (homeTotal / income) * 100;
-  state.setupStatus = homeRatio > 30
-    ? "[GUARDADO] Casa y servicios supera el 30% recomendado para este mes."
+  state.setupStatus = homeRatio > rules.houseAndServicesMaxPercentage
+    ? `[GUARDADO] Casa y servicios supera el ${rules.houseAndServicesMaxPercentage}% recomendado para este mes.`
     : "[GUARDADO] Mes configurado.";
   state.setupOpen = false;
   state.activeView = "dashboard";
@@ -1172,7 +1402,7 @@ function bindEvents(root) {
   });
 
   root.addEventListener("submit", (event) => {
-    if (["transaction-form", "setup-form", "credit-card-settings-form"].includes(event.target.id)) handleSubmit(event);
+    if (["transaction-form", "setup-form", "credit-card-settings-form", "goal-rules-form"].includes(event.target.id)) handleSubmit(event);
   });
 
   root.addEventListener("click", (event) => {

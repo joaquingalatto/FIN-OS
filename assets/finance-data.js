@@ -15,6 +15,7 @@ export const CATEGORIES = [
   "Mantenimiento de casa",
   "Comida / Supermercado",
   "Ocio",
+  "Gastos hormiga",
   "Ropa",
   "Transporte",
   "Salud",
@@ -61,11 +62,22 @@ export const defaultCreditCardSettings = {
   dangerThreshold: 90,
 };
 
+export const defaultMonthlyGoalRules = {
+  savingsPercentage: 40,
+  houseAndServicesMaxPercentage: 30,
+  creditCardTargetPercentage: 16,
+  leisureTargetPercentage: 12,
+  smallExpensesTargetPercentage: 5,
+  safetyMarginPercentage: 5,
+};
+
 export const mockSettings = {
   displayCurrency: "ARS",
   defaultExchangeRateType: "blue",
   useSavedRateForHistory: true,
+  monthlyGoalRules: defaultMonthlyGoalRules,
   monthlySavingsGoal: 0,
+  monthlySafetyMargin: 0,
   totalSavingsGoal: 0,
   monthlyIncomeTarget: 0,
   monthConfiguredAt: "",

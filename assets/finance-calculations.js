@@ -1,4 +1,4 @@
-import { HOME_SERVICE_CATEGORIES } from "./finance-data.js";
+import { HOME_SERVICE_CATEGORIES, defaultMonthlyGoalRules } from "./finance-data.js";
 import { convertFromARS, formatMoney, formatPercent, investmentValueToARS, movementToARS, toARS } from "./finance-currency.js";
 
 const NOW = new Date("2026-05-31T12:00:00-03:00");
@@ -19,6 +19,27 @@ function isInMonth(item, key) {
 
 function sumARS(items) {
   return items.reduce((sum, item) => sum + movementToARS(item), 0);
+}
+
+function amountFromPercentage(income, percentage) {
+  return (Number(income || 0) * Number(percentage || 0)) / 100;
+}
+
+function percentageOfIncome(amount, income) {
+  return income ? (Number(amount || 0) / income) * 100 : 0;
+}
+
+function goalStatus(actual, target, mode = "target") {
+  if (!target) return { id: "empty", label: "Sin ingreso", tone: "neutral" };
+  const ratio = (actual / target) * 100;
+  if (mode === "minimum") {
+    if (actual >= target) return { id: "ok", label: "Dentro del objetivo", tone: "good" };
+    if (ratio >= 85) return { id: "near", label: "Cerca del objetivo", tone: "warn" };
+    return { id: "exceeded", label: "Necesita ajuste", tone: "bad" };
+  }
+  if (actual > target) return { id: "exceeded", label: "Excedido", tone: "bad" };
+  if (ratio >= 85) return { id: "near", label: "Cerca del limite", tone: "warn" };
+  return { id: "ok", label: "Dentro del objetivo", tone: "good" };
 }
 
 function monthToIndex(monthKey) {
@@ -100,6 +121,109 @@ function calculateCreditCardSummary({ expenses, installmentPurchases = [], rates
     hasCreditCardData: committedInstallments.length > 0 || newCreditCardPurchases.length > 0,
     isLimitConfigured: Boolean(creditCardSettings.month),
     futureCommittedTotal: activeInstallments.reduce((sum, item) => sum + item.futureCommittedARS, 0),
+  };
+}
+
+function calculateMonthlyGoals({ incomeARS, settings, homeServicesARS, recurringHomeServicesARS, creditCardSummary, categoryRows, savingARS }) {
+  const rules = { ...defaultMonthlyGoalRules, ...(settings.monthlyGoalRules || {}) };
+  const income = Number(incomeARS || settings.monthlyIncomeTarget || 0);
+  if (!income) {
+    return {
+      month: currentMonthKey(),
+      income: 0,
+      rules,
+      savingsTargetPercentage: rules.savingsPercentage,
+      savingsTargetAmount: 0,
+      savingsActualAmount: 0,
+      savingsActualPercentage: 0,
+      houseAndServicesMaxPercentage: rules.houseAndServicesMaxPercentage,
+      houseAndServicesMaxAmount: 0,
+      houseAndServicesActualAmount: 0,
+      houseAndServicesActualPercentage: 0,
+      creditCardTargetPercentage: rules.creditCardTargetPercentage,
+      creditCardTargetAmount: 0,
+      creditCardActualAmount: 0,
+      creditCardActualPercentage: 0,
+      leisureTargetPercentage: rules.leisureTargetPercentage,
+      leisureTargetAmount: 0,
+      leisureActualAmount: 0,
+      leisureActualPercentage: 0,
+      smallExpensesTargetPercentage: rules.smallExpensesTargetPercentage,
+      smallExpensesTargetAmount: 0,
+      smallExpensesActualAmount: 0,
+      smallExpensesActualPercentage: 0,
+      safetyMarginPercentage: rules.safetyMarginPercentage,
+      safetyMarginAmount: 0,
+      safetyMarginActualPercentage: 0,
+      remainingUnassignedAmount: 0,
+      flexibleAvailableAmount: 0,
+      leisureAndSmallAvailableAmount: 0,
+      createdAt: settings.monthConfiguredAt || "",
+      updatedAt: settings.monthConfiguredAt || "",
+      statuses: {
+        savings: goalStatus(0, 0, "minimum"),
+        houseAndServices: goalStatus(0, 0),
+        creditCard: goalStatus(0, 0),
+        leisure: goalStatus(0, 0),
+        smallExpenses: goalStatus(0, 0),
+        safetyMargin: goalStatus(0, 0),
+      },
+    };
+  }
+  const savingsTargetAmount = Number(settings.monthlySavingsGoal || amountFromPercentage(income, rules.savingsPercentage));
+  const houseAndServicesActualAmount = homeServicesARS || recurringHomeServicesARS || 0;
+  const creditCardActualAmount = creditCardSummary?.estimatedStatementTotal || 0;
+  const leisureActualAmount = categoryRows.find((row) => row.category === "Ocio")?.amountARS || 0;
+  const smallExpensesActualAmount = categoryRows.find((row) => row.category === "Gastos hormiga")?.amountARS || 0;
+  const houseAndServicesMaxAmount = amountFromPercentage(income, rules.houseAndServicesMaxPercentage);
+  const creditCardTargetAmount = amountFromPercentage(income, rules.creditCardTargetPercentage);
+  const leisureTargetAmount = amountFromPercentage(income, rules.leisureTargetPercentage);
+  const smallExpensesTargetAmount = amountFromPercentage(income, rules.smallExpensesTargetPercentage);
+  const safetyMarginAmount = Number(settings.monthlySafetyMargin || amountFromPercentage(income, rules.safetyMarginPercentage));
+  const remainingUnassignedAmount = Math.max(income - savingsTargetAmount - houseAndServicesActualAmount - creditCardActualAmount - leisureTargetAmount - smallExpensesTargetAmount - safetyMarginAmount, 0);
+  const flexibleAvailableAmount = Math.max(income - savingsTargetAmount - houseAndServicesActualAmount - creditCardActualAmount - safetyMarginAmount, 0);
+  const leisureAndSmallAvailableAmount = Math.max(income - savingsTargetAmount - houseAndServicesActualAmount - creditCardActualAmount, 0);
+
+  return {
+    month: currentMonthKey(),
+    income,
+    rules,
+    savingsTargetPercentage: rules.savingsPercentage,
+    savingsTargetAmount,
+    savingsActualAmount: savingARS,
+    savingsActualPercentage: percentageOfIncome(savingARS, income),
+    houseAndServicesMaxPercentage: rules.houseAndServicesMaxPercentage,
+    houseAndServicesMaxAmount,
+    houseAndServicesActualAmount,
+    houseAndServicesActualPercentage: percentageOfIncome(houseAndServicesActualAmount, income),
+    creditCardTargetPercentage: rules.creditCardTargetPercentage,
+    creditCardTargetAmount,
+    creditCardActualAmount,
+    creditCardActualPercentage: percentageOfIncome(creditCardActualAmount, income),
+    leisureTargetPercentage: rules.leisureTargetPercentage,
+    leisureTargetAmount,
+    leisureActualAmount,
+    leisureActualPercentage: percentageOfIncome(leisureActualAmount, income),
+    smallExpensesTargetPercentage: rules.smallExpensesTargetPercentage,
+    smallExpensesTargetAmount,
+    smallExpensesActualAmount,
+    smallExpensesActualPercentage: percentageOfIncome(smallExpensesActualAmount, income),
+    safetyMarginPercentage: rules.safetyMarginPercentage,
+    safetyMarginAmount,
+    safetyMarginActualPercentage: percentageOfIncome(safetyMarginAmount, income),
+    remainingUnassignedAmount,
+    flexibleAvailableAmount,
+    leisureAndSmallAvailableAmount,
+    createdAt: settings.monthConfiguredAt || "",
+    updatedAt: settings.monthConfiguredAt || "",
+    statuses: {
+      savings: goalStatus(savingARS, savingsTargetAmount, "minimum"),
+      houseAndServices: goalStatus(houseAndServicesActualAmount, houseAndServicesMaxAmount),
+      creditCard: goalStatus(creditCardActualAmount, creditCardTargetAmount),
+      leisure: goalStatus(leisureActualAmount, leisureTargetAmount),
+      smallExpenses: goalStatus(smallExpensesActualAmount, smallExpensesTargetAmount),
+      safetyMargin: goalStatus(safetyMarginAmount, amountFromPercentage(income, rules.safetyMarginPercentage)),
+    },
   };
 }
 
@@ -193,6 +317,15 @@ export function calculateMetrics({ transactions, budgets, recurringExpenses, sav
   const recurringHomeServicesARS = activeRecurring
     .filter((item) => HOME_SERVICE_CATEGORIES.includes(item.category))
     .reduce((sum, item) => sum + toARS(item.amount, item.currency, item.exchangeRate), 0);
+  const monthlyGoals = calculateMonthlyGoals({
+    incomeARS,
+    settings,
+    homeServicesARS,
+    recurringHomeServicesARS,
+    creditCardSummary,
+    categoryRows,
+    savingARS,
+  });
 
   return {
     monthKey,
@@ -225,6 +358,7 @@ export function calculateMetrics({ transactions, budgets, recurringExpenses, sav
     categoryGrowth,
     budgetsWithProgress,
     creditCardSummary,
+    monthlyGoals,
     activeInstallments,
     recurringActive: activeRecurring,
     recurringPaused: recurringExpenses.filter((item) => item.status === "paused"),
@@ -287,6 +421,8 @@ export function generateInsights(metrics, settings, rates) {
 
   if (!metrics.expenses.length) {
     return [
+      metrics.incomeARS ? `Tu objetivo de ahorro sugerido es el ${metrics.monthlyGoals.savingsTargetPercentage}% de tus ingresos.` : "Carga tus ingresos para activar objetivos porcentuales.",
+      metrics.incomeARS ? `Tu margen de seguridad disponible es de ${formatMoney(convertFromARS(metrics.monthlyGoals.safetyMarginAmount, settings.displayCurrency, rates, settings.defaultExchangeRateType), settings.displayCurrency)}.` : "Carga tu ingreso mensual para calcular tus objetivos del mes.",
       "Todavia no cargaste gastos este mes.",
       "Agrega tu primer gasto para entender en que se va la plata.",
       "Cuando cargues gastos de ocio, vamos a mostrar tu evolucion mensual.",
@@ -299,10 +435,22 @@ export function generateInsights(metrics, settings, rates) {
   const rateType = settings.defaultExchangeRateType;
   const projected = convertFromARS(metrics.projectedExpenseARS, currency, rates, rateType);
   const availablePerDay = convertFromARS(metrics.availablePerDayARS, currency, rates, rateType);
+  const flexibleAvailable = convertFromARS(metrics.monthlyGoals.leisureAndSmallAvailableAmount, currency, rates, rateType);
+  const safetyMargin = convertFromARS(metrics.monthlyGoals.safetyMarginAmount, currency, rates, rateType);
   const ocio = metrics.categoryRows.find((row) => row.category === "Ocio");
   const ocioSaving = ocio ? ocio.amountARS * 0.15 : metrics.variableExpenseARS * 0.1;
+  const goalInsights = metrics.incomeARS ? [
+    `Tu objetivo de ahorro sugerido es el ${metrics.monthlyGoals.savingsTargetPercentage}% de tus ingresos.`,
+    `Casa y servicios representa ${metrics.monthlyGoals.houseAndServicesActualPercentage.toFixed(0)}% de tus ingresos este mes.`,
+    `Tarjeta representa ${metrics.monthlyGoals.creditCardActualPercentage.toFixed(0)}% de tus ingresos este mes.`,
+    `Ocio representa ${metrics.monthlyGoals.leisureActualPercentage.toFixed(0)}% de tus ingresos este mes.`,
+    `Gastos hormiga representa ${metrics.monthlyGoals.smallExpensesActualPercentage.toFixed(0)}% de tus ingresos este mes.`,
+    `Te quedan ${formatMoney(flexibleAvailable, currency)} para ocio y gastos hormiga sin afectar tu ahorro.`,
+    `Tu margen de seguridad disponible es de ${formatMoney(safetyMargin, currency)}.`,
+  ] : [];
 
   return [
+    ...goalInsights.slice(0, 3),
     metrics.expenseVariation && metrics.expenseVariation > 5
       ? `Estas gastando ${formatPercent(metrics.expenseVariation)} mas que el mes pasado.`
       : "Todavia no hay historial suficiente para comparar contra el mes anterior.",
@@ -314,6 +462,7 @@ export function generateInsights(metrics, settings, rates) {
     metrics.incomeARS ? `Tus gastos fijos representan ${metrics.ratios.fixed.toFixed(0)}% de tus ingresos.` : "Carga tus ingresos para calcular que porcentaje ocupan tus gastos fijos.",
     `Te quedan ${formatMoney(availablePerDay, currency)} por dia para mantener tu objetivo de ahorro.`,
     fastestGrowth ? `La categoria que mas crecio fue ${fastestGrowth.category}.` : "No hay una categoria con crecimiento relevante este mes.",
+    metrics.incomeARS ? "Si mantenes estos limites, podrias ahorrar el 40% de tu ingreso." : "Carga tus ingresos para activar objetivos porcentuales.",
   ];
 }
 
