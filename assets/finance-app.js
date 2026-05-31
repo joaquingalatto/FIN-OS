@@ -451,7 +451,7 @@ function dollarWidget() {
     </div>
     <div class="line-list">
       ${rows.map((rate) => `<div class="line-item">
-        <span><span class="dot ${rate.type === state.settings.defaultExchangeRateType ? "bad" : ""}"></span> ${escapeHtml(rate.label)}</span>
+        <span><span class="dot ${rate.type === state.settings.defaultExchangeRateType ? "good" : ""}"></span> ${escapeHtml(rate.label)}</span>
         <strong class="mono">${formatMoney(rate.sell, "ARS")}</strong>
       </div>`).join("")}
     </div>
@@ -490,12 +490,12 @@ function transactionItem(item) {
   const amountARS = movementToARS(item);
   const isExpense = item.type === "expense";
   const sign = item.type === "income" ? "+" : isExpense ? "-" : "";
-  const className = item.type === "income" ? "status-good" : isExpense ? "status-bad" : "";
+  const className = item.type === "income" ? "status-good" : "";
   const installmentLabel = item.isInstallment ? ` · cuota ${item.installmentCurrent || 1}/${item.installmentTotal || 1}` : "";
   return `<article class="transaction-item">
     <div class="transaction-main">
       <div class="transaction-title">
-        <span class="dot ${isExpense ? "bad" : item.type === "income" ? "good" : "warn"}"></span>
+        <span class="dot ${item.type === "income" ? "good" : item.type === "expense" ? "" : "warn"}"></span>
         <strong>${escapeHtml(item.description || item.category || "Sin categoria")}${escapeHtml(installmentLabel)}</strong>
       </div>
       <div class="transaction-meta">${formatDate(item.date)} · ${escapeHtml(TYPE_LABELS[item.type])} · ${escapeHtml(item.category || "Sin categoria")} · ${item.isRecurring ? "Recurrente" : "Unico"}</div>
@@ -777,7 +777,7 @@ function closingView(metrics, closing) {
       <div class="panel-head"><div><h2>Cierre mensual</h2><p>Revision del comportamiento financiero del mes.</p></div></div>
       <div class="grid metrics-grid">
         ${metricCard("Ingreso", metrics.incomeARS)}
-        ${metricCard("Gasto", metrics.expenseARS, "status-bad")}
+        ${metricCard("Gasto", metrics.expenseARS)}
         ${metricCard("Ahorro", metrics.savingARS, "status-good")}
         ${metricCard("Inversion", metrics.investedThisMonthARS)}
       </div>
