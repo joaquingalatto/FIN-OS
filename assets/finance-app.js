@@ -230,7 +230,7 @@ function dashboardView(metrics, insights) {
         </article>
         ${chartCard(metrics)}
         ${recentTransactions(metrics.recentTransactions)}
-        <div class="grid metrics-grid">
+        <div class="grid metrics-grid dashboard-metrics">
           ${metricCard("Disponible", metrics.availableUntilMonthEndARS)}
           ${metricCard("Gastos", metrics.expenseARS)}
           ${metricCard("Ingresos", metrics.incomeARS)}
