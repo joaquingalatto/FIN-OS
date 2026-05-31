@@ -32,6 +32,10 @@ const TYPE_LABELS = {
   investment: "Inversion",
 };
 
+const SAVINGS_RATIO = 0.4;
+const FOOD_BUDGET_RATIO = 0.75;
+const LEISURE_BUDGET_RATIO = 0.25;
+
 let state = {
   activeView: "dashboard",
   modalOpen: false,
@@ -261,7 +265,7 @@ function zeroStartPanel() {
       <div><h2>Configura tu mes</h2><p>Arranca con ingreso, gastos fijos, objetivo sugerido de ahorro y presupuestos variables.</p></div>
     </div>
     <div class="grid three-grid">
-      ${actionCard("Configurar mes", "Carga ingreso mensual, casa y servicios, otros gastos fijos y presupuestos.", "openSetup")}
+      ${actionCard("Configurar mes", "Carga sueldo, alquiler, expensas y servicios. Comida y ocio se sugieren automaticamente.", "openSetup")}
       ${actionCard("Agregar ingreso", "Registra sueldo, freelance, extra u otro ingreso real.", "openAdd", "income")}
       ${actionCard("Agregar gasto", "Carga el primer gasto del mes sin pasos extra.", "openAdd", "expense")}
       ${actionCard("Definir presupuesto", "Crea limites variables para no pasarte durante el mes.", "openSetup")}
@@ -323,7 +327,7 @@ function homeServicesNotice(metrics) {
   return `<section class="insight-card">
     <span class="label">Casa y servicios</span>
     <strong>Casa y servicios supera el 30% recomendado para este mes.</strong>
-    <p class="muted">Revisa alquiler, expensas, servicios, mantenimiento e internet dentro de este grupo.</p>
+    <p class="muted">Revisa alquiler, expensas y servicios dentro de este grupo.</p>
   </section>`;
 }
 
@@ -343,11 +347,12 @@ function transactionItem(item) {
   const isExpense = item.type === "expense";
   const sign = item.type === "income" ? "+" : isExpense ? "-" : "";
   const className = item.type === "income" ? "status-good" : isExpense ? "status-bad" : "";
+  const installmentLabel = item.isInstallment ? ` · cuota ${item.installmentCurrent || 1}/${item.installmentTotal || 1}` : "";
   return `<article class="transaction-item">
     <div class="transaction-main">
       <div class="transaction-title">
         <span class="dot ${isExpense ? "bad" : item.type === "income" ? "good" : "warn"}"></span>
-        <strong>${escapeHtml(item.description || item.category || "Sin categoria")}</strong>
+        <strong>${escapeHtml(item.description || item.category || "Sin categoria")}${escapeHtml(installmentLabel)}</strong>
       </div>
       <div class="transaction-meta">${formatDate(item.date)} · ${escapeHtml(TYPE_LABELS[item.type])} · ${escapeHtml(item.category || "Sin categoria")} · ${item.isRecurring ? "Recurrente" : "Unico"}</div>
     </div>
@@ -384,6 +389,12 @@ function recurringView(metrics) {
         ${state.recurringExpenses.length ? state.recurringExpenses.map((item) => recurringCard(item)).join("") : emptyState("Sin gastos recurrentes", "Configura tu mes o marca un gasto como recurrente para verlo aca.")}
       </div>
     </section>
+    <section class="panel">
+      <div class="panel-head"><div><h2>Cuotas activas</h2><p>Pagos en cuotas que todavia tienen meses pendientes.</p></div></div>
+      <div class="grid two-grid">
+        ${metrics.activeInstallments.length ? metrics.activeInstallments.map(installmentCard).join("") : emptyState("Sin cuotas cargadas", "Cuando estes pagando una compra en cuotas, marcala al cargar el gasto.")}
+      </div>
+    </section>
   </div>`;
 }
 
@@ -393,6 +404,18 @@ function recurringCard(item) {
     <strong class="transaction-title">${escapeHtml(item.name)}</strong>
     <div class="row-between"><span class="muted">Proximo</span><span class="mono">${formatDate(item.nextDueDate)}</span></div>
     <div class="row-between"><span class="muted">Monto</span><strong class="mono">${formatMoney(convertFromARS(toARS(item.amount, item.currency, item.exchangeRate), state.settings.displayCurrency, state.rates, state.settings.defaultExchangeRateType), state.settings.displayCurrency)}</strong></div>
+  </article>`;
+}
+
+function installmentCard(item) {
+  const current = Number(item.installmentCurrent || 1);
+  const total = Number(item.installmentTotal || 1);
+  const remaining = Math.max(total - current, 0);
+  return `<article class="recurring-card">
+    <div class="row-between"><span class="label">Cuota</span><span class="chip">${current}/${total}</span></div>
+    <strong class="transaction-title">${escapeHtml(item.installmentName || item.description || "Compra en cuotas")}</strong>
+    <div class="row-between"><span class="muted">Monto mensual</span><strong class="mono">${moneyARS(movementToARS(item))}</strong></div>
+    <div class="row-between"><span class="muted">Restantes</span><span class="mono">${remaining}</span></div>
   </article>`;
 }
 
@@ -576,29 +599,22 @@ function setupModal() {
         <button class="btn btn-secondary" data-action="closeSetup" type="button">[ X ]</button>
       </div>
       <div class="modal-body">
-        <p class="muted">Carga solo datos reales. El objetivo sugerido de ahorro se calcula como 40% del ingreso mensual.</p>
+        <p class="muted">Carga solo datos reales. El objetivo de ahorro se fija siempre en 40% del sueldo; comida y ocio se calculan con lo que queda despues de alquiler, expensas y servicios.</p>
         <div class="form-grid">
-          <div class="field full"><label for="monthlyIncome">Ingreso mensual</label><input id="monthlyIncome" name="monthlyIncome" type="number" inputmode="decimal" min="0" step="0.01" required placeholder="Ingreso real del mes"></div>
+          <div class="field full"><label for="monthlyIncome">Sueldo mensual</label><input id="monthlyIncome" name="monthlyIncome" type="number" inputmode="decimal" min="0" step="0.01" required placeholder="Sueldo real del mes"></div>
           <div class="field"><label for="rent">Alquiler</label><input id="rent" name="rent" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
           <div class="field"><label for="buildingFees">Expensas</label><input id="buildingFees" name="buildingFees" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
           <div class="field"><label for="utilities">Servicios</label><input id="utilities" name="utilities" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
-          <div class="field"><label for="homeMaintenance">Mantenimiento</label><input id="homeMaintenance" name="homeMaintenance" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
-          <div class="field"><label for="internet">Internet</label><input id="internet" name="internet" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
-          <div class="field"><label for="otherHome">Otros hogar</label><input id="otherHome" name="otherHome" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
-          <div class="field full"><label for="otherFixed">Otros gastos fijos</label><input id="otherFixed" name="otherFixed" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
         </div>
         <div class="panel nested-panel">
-          <div class="panel-head"><div><h3>Presupuestos variables</h3><p>Deja vacio lo que todavia no quieras definir.</p></div></div>
-          <div class="form-grid">
-            <div class="field"><label for="budgetFood">Comida</label><input id="budgetFood" name="budgetFood" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
-            <div class="field"><label for="budgetLeisure">Ocio</label><input id="budgetLeisure" name="budgetLeisure" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
-            <div class="field"><label for="budgetClothes">Ropa</label><input id="budgetClothes" name="budgetClothes" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
-            <div class="field"><label for="budgetTransport">Transporte</label><input id="budgetTransport" name="budgetTransport" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
-            <div class="field"><label for="budgetHealth">Salud</label><input id="budgetHealth" name="budgetHealth" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
-            <div class="field"><label for="budgetOther">Otros</label><input id="budgetOther" name="budgetOther" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></div>
+          <div class="panel-head"><div><h3>Presupuestos sugeridos</h3><p>Comida usa 75% de la bolsa variable y ocio 25%. La bolsa variable es sueldo menos ahorro, alquiler, expensas y servicios.</p></div></div>
+          <div class="line-list">
+            <div class="line-item"><span>Objetivo de ahorro</span><strong class="mono">40% del sueldo</strong></div>
+            <div class="line-item"><span>Comida</span><strong class="mono">75% de variable</strong></div>
+            <div class="line-item"><span>Ocio</span><strong class="mono">25% de variable</strong></div>
           </div>
         </div>
-        <div class="inline-status ${state.setupStatus.startsWith("[ERROR") ? "is-error" : ""}">${escapeHtml(state.setupStatus || "[GUIA] Objetivo sugerido: 40% del ingreso mensual.")}</div>
+        <div class="inline-status ${state.setupStatus.startsWith("[ERROR") ? "is-error" : ""}">${escapeHtml(state.setupStatus || "[GUIA] Ahorro: 40% del sueldo. Comida y ocio se definen automaticamente.")}</div>
         <button class="btn btn-primary" type="submit">Guardar configuracion</button>
       </div>
     </form>
@@ -626,6 +642,15 @@ function addModal() {
         <div class="switch-row">
           <label class="check-pill"><input type="checkbox" name="isFixed"> Gasto fijo</label>
           <label class="check-pill"><input type="checkbox" name="isRecurring"> Recurrente</label>
+          <label class="check-pill"><input type="checkbox" name="isInstallment"> Es cuota</label>
+        </div>
+        <div class="panel nested-panel">
+          <div class="panel-head"><div><h3>Cuotas</h3><p>Completa esto si estas pagando una compra en cuotas.</p></div></div>
+          <div class="form-grid">
+            <div class="field full"><label for="installmentName">Compra</label><input id="installmentName" name="installmentName" type="text" placeholder="Ej: heladera, tarjeta, curso"></div>
+            <div class="field"><label for="installmentCurrent">Cuota actual</label><input id="installmentCurrent" name="installmentCurrent" type="number" inputmode="numeric" min="1" step="1" placeholder="Ej: 2"></div>
+            <div class="field"><label for="installmentTotal">Total cuotas</label><input id="installmentTotal" name="installmentTotal" type="number" inputmode="numeric" min="1" step="1" placeholder="Ej: 12"></div>
+          </div>
         </div>
         <div class="inline-status ${state.formStatus.startsWith("[ERROR") ? "is-error" : ""}">${escapeHtml(state.formStatus || `[TIPO DE CAMBIO ${state.rates[state.settings.defaultExchangeRateType].label.toUpperCase()}: ${formatMoney(rate, "ARS")}]`)}</div>
         <button class="btn btn-primary" type="submit">Guardar</button>
@@ -739,6 +764,10 @@ function handleSubmit(event) {
     paymentMethod: formData.get("paymentMethod"),
     isFixed: formData.get("isFixed") === "on",
     isRecurring: formData.get("isRecurring") === "on",
+    isInstallment: formData.get("isInstallment") === "on",
+    installmentName: String(formData.get("installmentName") || "").trim(),
+    installmentCurrent: readPositiveInteger(formData.get("installmentCurrent"), 1),
+    installmentTotal: readPositiveInteger(formData.get("installmentTotal"), 1),
     createdAt: now,
     updatedAt: now,
   };
@@ -764,6 +793,12 @@ function handleSubmit(event) {
       date: item.date,
       notes: item.description || "Seguimiento personal.",
     }, ...state.investments];
+  }
+
+  if (item.isInstallment && item.type === "expense") {
+    item.category = "Cuotas";
+    item.isFixed = true;
+    item.isRecurring = true;
   }
 
   if (item.isRecurring && item.type === "expense") {
@@ -792,6 +827,11 @@ function handleSubmit(event) {
 function readAmount(formData, key) {
   const value = Number(formData.get(key));
   return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function readPositiveInteger(value, fallback = 1) {
+  const number = Number.parseInt(value, 10);
+  return Number.isFinite(number) && number > 0 ? number : fallback;
 }
 
 function makeTransaction({ type, amount, category, description, isFixed = false, isRecurring = false }) {
@@ -844,14 +884,10 @@ function handleSetupSubmit(form) {
     ["rent", "Alquiler", "Alquiler"],
     ["buildingFees", "Expensas", "Expensas"],
     ["utilities", "Servicios", "Servicios"],
-    ["homeMaintenance", "Mantenimiento de casa", "Mantenimiento de casa"],
-    ["internet", "Internet", "Internet"],
-    ["otherHome", "Otros gastos del hogar", "Otros gastos del hogar"],
   ]
     .map(([key, category, description]) => ({ amount: readAmount(formData, key), category, description }))
     .filter((item) => item.amount > 0);
 
-  const otherFixed = readAmount(formData, "otherFixed");
   const fixedTransactions = homeItems.map((item) => makeTransaction({
     type: "expense",
     amount: item.amount,
@@ -860,17 +896,6 @@ function handleSetupSubmit(form) {
     isFixed: true,
     isRecurring: true,
   }));
-
-  if (otherFixed) {
-    fixedTransactions.push(makeTransaction({
-      type: "expense",
-      amount: otherFixed,
-      category: "Otros",
-      description: "Otros gastos fijos",
-      isFixed: true,
-      isRecurring: true,
-    }));
-  }
 
   const incomeTransaction = makeTransaction({
     type: "income",
@@ -881,25 +906,23 @@ function handleSetupSubmit(form) {
     isRecurring: true,
   });
 
-  const budgetFields = [
-    ["budgetFood", "Comida / Supermercado"],
-    ["budgetLeisure", "Ocio"],
-    ["budgetClothes", "Ropa"],
-    ["budgetTransport", "Transporte"],
-    ["budgetHealth", "Salud"],
-    ["budgetOther", "Otros"],
-  ];
-  const configuredBudgets = budgetFields
-    .map(([key, category]) => ({ category, amount: readAmount(formData, key) }))
-    .filter((item) => item.amount > 0)
-    .map((item) => ({
-      id: `bud-${item.category.toLowerCase().replaceAll(" ", "-")}`,
-      category: item.category,
-      monthlyLimit: item.amount,
+  const homeTotal = homeItems.reduce((sum, item) => sum + item.amount, 0);
+  const suggestedSavingsGoal = income * SAVINGS_RATIO;
+  const variablePool = Math.max(income - suggestedSavingsGoal - homeTotal, 0);
+  const configuredBudgets = [
+    {
+      id: "bud-comida-supermercado",
+      category: "Comida / Supermercado",
+      monthlyLimit: Math.round(variablePool * FOOD_BUDGET_RATIO),
       currency: "ARS",
-    }));
-
-  const suggestedSavingsGoal = income * 0.4;
+    },
+    {
+      id: "bud-ocio",
+      category: "Ocio",
+      monthlyLimit: Math.round(variablePool * LEISURE_BUDGET_RATIO),
+      currency: "ARS",
+    },
+  ].filter((budget) => budget.monthlyLimit > 0);
   state.transactions = [incomeTransaction, ...fixedTransactions, ...state.transactions];
   state.recurringExpenses = [...fixedTransactions.map(makeRecurringFromTransaction), ...state.recurringExpenses];
   state.budgets = configuredBudgets;
@@ -914,7 +937,6 @@ function handleSetupSubmit(form) {
     monthlyGoal: suggestedSavingsGoal,
   };
 
-  const homeTotal = homeItems.reduce((sum, item) => sum + item.amount, 0);
   const homeRatio = (homeTotal / income) * 100;
   state.setupStatus = homeRatio > 30
     ? "[GUARDADO] Casa y servicios supera el 30% recomendado para este mes."

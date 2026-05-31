@@ -8,6 +8,8 @@ export const EXCHANGE_RATE_TYPES = [
 
 export const CATEGORIES = [
   "Casa y servicios",
+  "Alquiler",
+  "Expensas",
   "Mantenimiento de casa",
   "Comida / Supermercado",
   "Ocio",
@@ -17,6 +19,7 @@ export const CATEGORIES = [
   "Servicios",
   "Suscripciones",
   "Gimnasio",
+  "Cuotas",
   "Otros",
 ];
 

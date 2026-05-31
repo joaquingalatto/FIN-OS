@@ -96,6 +96,9 @@ export function calculateMetrics({ transactions, budgets, recurringExpenses, sav
 
   const activeRecurring = recurringExpenses.filter((item) => item.status === "active");
   const fixedMonthlyARS = activeRecurring.reduce((sum, item) => sum + toARS(item.amount, item.currency, item.exchangeRate), 0);
+  const activeInstallments = transactions
+    .filter((item) => item.type === "expense" && item.isInstallment && Number(item.installmentCurrent || 0) < Number(item.installmentTotal || 0))
+    .sort((a, b) => a.date.localeCompare(b.date));
   const homeServicesARS = expenses
     .filter((item) => HOME_SERVICE_CATEGORIES.includes(item.category))
     .reduce((sum, item) => sum + movementToARS(item), 0);
@@ -133,6 +136,7 @@ export function calculateMetrics({ transactions, budgets, recurringExpenses, sav
     categoryRows,
     categoryGrowth,
     budgetsWithProgress,
+    activeInstallments,
     recurringActive: activeRecurring,
     recurringPaused: recurringExpenses.filter((item) => item.status === "paused"),
     ratios: {

@@ -30,12 +30,14 @@ No muestra gastos, ingresos, presupuestos ni inversiones ficticias como estado i
 ## Funcionalidades
 
 - Dashboard responsive.
-- Flujo de configuracion mensual.
+- Flujo de configuracion mensual con sueldo, alquiler, expensas y servicios.
 - Registro rapido de gastos, ingresos, ahorros e inversiones.
+- Registro de compras en cuotas.
 - Categorias y gastos recurrentes.
 - Presupuestos variables.
-- Objetivo sugerido de ahorro del 40% del ingreso mensual.
-- Aviso cuando Casa y servicios supera el 30% recomendado del ingreso.
+- Objetivo de ahorro automatico del 40% del sueldo mensual.
+- Presupuestos sugeridos para comida y ocio usando la bolsa variable restante.
+- Aviso cuando alquiler, expensas y servicios superan el 30% recomendado del ingreso.
 - Toggle ARS/USD.
 - Cotizacion de dolar oficial, blue y MEP via DolarApi con fallback local.
 
