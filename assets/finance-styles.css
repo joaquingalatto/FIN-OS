@@ -1140,6 +1140,10 @@ button:disabled {
   .mobile-nav-item {
     min-width: 0;
     min-height: 64px;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 3px;
     border: 0;
     background: transparent;
     color: var(--text-disabled);
@@ -1147,6 +1151,24 @@ button:disabled {
     font-size: 10px;
     letter-spacing: 0.04em;
     text-transform: uppercase;
+  }
+
+  .mobile-nav-item .nav-icon {
+    width: 21px;
+    height: 21px;
+    transform: scale(0.86);
+  }
+
+  .mobile-nav-label {
+    max-width: 100%;
+    color: currentColor;
+    font-family: "Space Mono", monospace;
+    font-size: 8px;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .mobile-nav-item.is-active {

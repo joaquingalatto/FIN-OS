@@ -198,7 +198,7 @@ function navButton(item) {
 }
 
 function mobileNavButton(item) {
-  return `<button class="mobile-nav-item ${state.activeView === item.id ? "is-active" : ""}" data-view="${item.id}" type="button" aria-label="${escapeHtml(item.label)}" title="${escapeHtml(item.label)}">${navIcon(item.id)}<span class="sr-only">${escapeHtml(item.label)}</span></button>`;
+  return `<button class="mobile-nav-item ${state.activeView === item.id ? "is-active" : ""}" data-view="${item.id}" type="button" aria-label="${escapeHtml(item.label)}" title="${escapeHtml(item.label)}">${navIcon(item.id)}<span class="mobile-nav-label">${escapeHtml(item.short || item.label)}</span></button>`;
 }
 
 function navIcon(id) {
