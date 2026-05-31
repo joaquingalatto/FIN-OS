@@ -224,7 +224,6 @@ function dashboardView(metrics, insights) {
             <div class="hero-meta">
               <span class="chip">Por dia <strong>${moneyARS(metrics.availablePerDayARS)}</strong></span>
               <span class="chip">Presupuestos <strong>${metrics.budgetsWithProgress.length ? "Configurados" : "Sin configurar"}</strong></span>
-              <span class="chip">Dolar ${state.rates[state.settings.defaultExchangeRateType].label} <strong>${formatMoney(getRate(state.rates, state.settings.defaultExchangeRateType), "ARS")}</strong></span>
             </div>
           </div>
           <div class="hero-actions-compact">
