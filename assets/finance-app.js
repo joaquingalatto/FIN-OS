@@ -142,6 +142,10 @@ function appChrome(metrics) {
       <section class="main-shell">
         <header class="topbar">
           <div class="topbar-title">
+            <div class="topbar-brand" aria-label="FIN OS">
+              <strong>FIN//OS</strong>
+              <span class="label">Cargar / Entender / Optimizar</span>
+            </div>
             <span class="label">${escapeHtml(activeLabel)}</span>
             <h1>${topbarTitle(metrics)}</h1>
           </div>

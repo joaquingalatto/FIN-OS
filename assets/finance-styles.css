@@ -222,8 +222,26 @@ button:disabled {
 
 .topbar-title {
   display: grid;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
+}
+
+.topbar-brand {
+  display: none;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--text-display);
+}
+
+.topbar-brand strong {
+  font-family: "Doto", "Space Mono", monospace;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 0.9;
+}
+
+.topbar-brand .label {
+  color: var(--text-disabled);
 }
 
 .topbar-title h1 {
@@ -845,6 +863,10 @@ button:disabled {
     padding: 12px var(--gutter);
   }
 
+  .topbar-brand {
+    display: flex;
+  }
+
   .topbar-actions {
     gap: 8px;
   }
@@ -911,6 +933,15 @@ button:disabled {
   .topbar {
     align-items: start;
     display: grid;
+  }
+
+  .topbar-brand {
+    display: grid;
+    gap: 3px;
+  }
+
+  .topbar-brand strong {
+    font-size: 30px;
   }
 
   .topbar-actions {
