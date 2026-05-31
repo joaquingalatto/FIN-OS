@@ -240,10 +240,6 @@ button:disabled {
   line-height: 0.9;
 }
 
-.topbar-brand .label {
-  color: var(--text-disabled);
-}
-
 .topbar-title h1 {
   margin: 0;
   color: var(--text-display);
@@ -933,11 +929,6 @@ button:disabled {
   .topbar {
     align-items: start;
     display: grid;
-  }
-
-  .topbar-brand {
-    display: grid;
-    gap: 3px;
   }
 
   .topbar-brand strong {
