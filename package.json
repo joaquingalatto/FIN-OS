@@ -1,0 +1,10 @@
+{
+  "name": "fin-os",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Web app responsive para manejar finanzas personales desde cero cada mes.",
+  "scripts": {
+    "start": "node dev-server.cjs",
+    "check": "node --check assets/finance-app.js && node --check assets/finance-calculations.js && node --check assets/finance-currency.js && node --check assets/finance-data.js && node --check assets/finance-services.js"
+  }
+}

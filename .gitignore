@@ -1,0 +1,16 @@
+.server-*.log
+node_modules/
+.DS_Store
+Thumbs.db
+
+# Archivos heredados de otra propuesta web en la carpeta local.
+contacto.html
+flebologia.html
+medicina-estetica.html
+nosotros.html
+publicaciones.html
+turno.html
+assets/script.js
+assets/styles.css
+assets/images/
+assets/video/
