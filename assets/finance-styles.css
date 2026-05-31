@@ -1208,10 +1208,14 @@ button:disabled {
   .topbar-actions {
     width: 100%;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(104px, 0.72fr) auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: center;
     gap: 8px;
-    justify-content: space-between;
+  }
+
+  .topbar-actions > .btn-secondary {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 
   .segmented {
@@ -1221,7 +1225,7 @@ button:disabled {
 
   .segmented button {
     min-width: 0;
-    padding: 0 10px;
+    padding: 0 12px;
   }
 
   .select-wrap select {
