@@ -256,9 +256,11 @@ button:disabled {
 
 .user-mark {
   color: var(--text-display);
-  font-family: "Space Mono", monospace;
-  font-size: 12px;
-  letter-spacing: 0.08em;
+  font-family: "Doto", "Space Mono", monospace;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 0.9;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -1040,9 +1042,9 @@ button:disabled {
 
   .user-mark {
     position: absolute;
-    top: 24px;
+    top: 18px;
     right: var(--gutter);
-    font-size: 11px;
+    font-size: 28px;
   }
 
   .hero-metric {
