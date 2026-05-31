@@ -13,7 +13,7 @@
   --success: #4a9e5c;
   --warning: #d4a843;
   --header: 76px;
-  --sidebar: 248px;
+  --sidebar: 112px;
   --bottom-nav: 74px;
   --gutter: 20px;
   color-scheme: dark;
@@ -113,7 +113,7 @@ button:disabled {
   position: sticky;
   top: 0;
   height: 100dvh;
-  padding: 24px 18px;
+  padding: 22px 16px;
   border-right: 1px solid var(--border);
   background: rgba(0, 0, 0, 0.92);
 }
@@ -121,15 +121,20 @@ button:disabled {
 .brand-mark {
   display: grid;
   gap: 8px;
-  padding: 4px 6px 28px;
+  justify-items: center;
+  padding: 4px 0 28px;
   color: var(--text-display);
 }
 
 .brand-mark strong {
   font-family: "Doto", "Space Mono", monospace;
-  font-size: 28px;
+  font-size: 22px;
   line-height: 1;
   font-weight: 700;
+}
+
+.brand-mark .label {
+  display: none;
 }
 
 .label {
@@ -152,7 +157,7 @@ button:disabled {
   min-height: 44px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
   width: 100%;
   border: 0;
@@ -168,6 +173,10 @@ button:disabled {
   transition: background 180ms ease, color 180ms ease;
 }
 
+.mobile-menu-item {
+  justify-content: flex-start;
+}
+
 .nav-item:hover,
 .mobile-menu-item:hover {
   background: var(--surface);
@@ -181,11 +190,163 @@ button:disabled {
 
 .nav-item.is-active::after,
 .mobile-menu-item.is-active::after {
+  position: absolute;
+  right: 8px;
   width: 6px;
   height: 6px;
   border-radius: 999px;
   background: var(--accent);
   content: "";
+}
+
+.nav-item,
+.mobile-menu-item {
+  position: relative;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.nav-icon {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+  color: currentColor;
+  flex: 0 0 24px;
+}
+
+.nav-icon::before,
+.nav-icon::after {
+  position: absolute;
+  content: "";
+}
+
+.icon-dashboard::before {
+  top: 6px;
+  left: 6px;
+  width: 4px;
+  height: 4px;
+  background: currentColor;
+  box-shadow: 8px 0 currentColor, 0 8px currentColor, 8px 8px currentColor;
+}
+
+.icon-expense::before,
+.icon-income::before {
+  top: 11px;
+  left: 5px;
+  width: 14px;
+  height: 2px;
+  background: currentColor;
+}
+
+.icon-income::after {
+  top: 5px;
+  left: 11px;
+  width: 2px;
+  height: 14px;
+  background: currentColor;
+}
+
+.icon-recurring::before,
+.icon-savings::before,
+.icon-settings::before {
+  inset: 5px;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+}
+
+.icon-recurring::after {
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-top: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+}
+
+.icon-card::before {
+  top: 7px;
+  left: 3px;
+  width: 18px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-radius: 3px;
+}
+
+.icon-card::after {
+  top: 11px;
+  left: 5px;
+  width: 14px;
+  height: 2px;
+  background: currentColor;
+}
+
+.icon-savings::after,
+.icon-settings::after {
+  top: 10px;
+  left: 10px;
+  width: 4px;
+  height: 4px;
+  background: currentColor;
+  border-radius: 999px;
+}
+
+.icon-settings::before {
+  box-shadow: 0 -5px 0 -3px currentColor, 0 5px 0 -3px currentColor, -5px 0 0 -3px currentColor, 5px 0 0 -3px currentColor;
+}
+
+.icon-investments::before {
+  left: 4px;
+  bottom: 5px;
+  width: 3px;
+  height: 7px;
+  background: currentColor;
+  box-shadow: 6px -4px currentColor, 12px -9px currentColor;
+}
+
+.icon-budgets::before {
+  left: 4px;
+  top: 5px;
+  width: 4px;
+  height: 14px;
+  border: 2px solid currentColor;
+  box-shadow: 7px 0 0 -2px var(--black), 8px 0 currentColor, 14px 0 0 -2px var(--black), 16px 0 currentColor;
+}
+
+.icon-metrics::before {
+  left: 3px;
+  top: 12px;
+  width: 4px;
+  height: 4px;
+  background: currentColor;
+  box-shadow: 6px -5px currentColor, 12px 2px currentColor, 18px -7px currentColor;
+}
+
+.icon-closing::before {
+  left: 6px;
+  top: 11px;
+  width: 10px;
+  height: 6px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+}
+
+.icon-more::before {
+  top: 10px;
+  left: 5px;
+  width: 4px;
+  height: 4px;
+  background: currentColor;
+  border-radius: 999px;
+  box-shadow: 6px 0 currentColor, 12px 0 currentColor;
 }
 
 .sidebar-footer {

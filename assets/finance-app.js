@@ -36,6 +36,20 @@ const TYPE_LABELS = {
   investment: "Inversion",
 };
 
+const NAV_ICON_CLASS = {
+  dashboard: "dashboard",
+  expenses: "expense",
+  income: "income",
+  recurring: "recurring",
+  "credit-card": "card",
+  savings: "savings",
+  investments: "investments",
+  budgets: "budgets",
+  metrics: "metrics",
+  closing: "closing",
+  settings: "settings",
+};
+
 let state = {
   activeView: "dashboard",
   modalOpen: false,
@@ -160,7 +174,7 @@ function appChrome(metrics) {
       <button class="btn btn-primary fab" data-action="openAdd" type="button">+ Gasto</button>
       <nav class="mobile-bottom-nav" aria-label="Navegacion mobile">
         ${NAV.filter((item) => item.mobile).map((item) => mobileNavButton(item)).join("")}
-        <button class="mobile-nav-item" data-action="openMobileMenu" type="button">Mas</button>
+        <button class="mobile-nav-item" data-action="openMobileMenu" type="button" aria-label="Mas secciones" title="Mas secciones"><span class="nav-icon icon-more" aria-hidden="true"></span><span class="sr-only">Mas</span></button>
       </nav>
       ${setupModal()}
       ${addModal()}
@@ -180,11 +194,15 @@ function topbarTitle(metrics) {
 }
 
 function navButton(item) {
-  return `<button class="nav-item ${state.activeView === item.id ? "is-active" : ""}" data-view="${item.id}" type="button">${item.label}</button>`;
+  return `<button class="nav-item ${state.activeView === item.id ? "is-active" : ""}" data-view="${item.id}" type="button" aria-label="${escapeHtml(item.label)}" title="${escapeHtml(item.label)}">${navIcon(item.id)}<span class="sr-only">${escapeHtml(item.label)}</span></button>`;
 }
 
 function mobileNavButton(item) {
-  return `<button class="mobile-nav-item ${state.activeView === item.id ? "is-active" : ""}" data-view="${item.id}" type="button">${item.short || item.label}</button>`;
+  return `<button class="mobile-nav-item ${state.activeView === item.id ? "is-active" : ""}" data-view="${item.id}" type="button" aria-label="${escapeHtml(item.label)}" title="${escapeHtml(item.label)}">${navIcon(item.id)}<span class="sr-only">${escapeHtml(item.label)}</span></button>`;
+}
+
+function navIcon(id) {
+  return `<span class="nav-icon icon-${NAV_ICON_CLASS[id] || "dashboard"}" aria-hidden="true"></span>`;
 }
 
 function renderViews(metrics) {
@@ -917,7 +935,7 @@ function mobileMenu() {
   return `<div class="mobile-menu-backdrop ${state.mobileMenuOpen ? "is-open" : ""}">
     <div class="mobile-menu">
       <div class="mobile-menu-head"><h2>Secciones</h2><button class="btn btn-secondary" data-action="closeMobileMenu" type="button">[ X ]</button></div>
-      <nav class="mobile-menu-list">${NAV.map((item) => `<button class="mobile-menu-item ${state.activeView === item.id ? "is-active" : ""}" data-view="${item.id}" type="button">${item.label}</button>`).join("")}</nav>
+      <nav class="mobile-menu-list">${NAV.map((item) => `<button class="mobile-menu-item ${state.activeView === item.id ? "is-active" : ""}" data-view="${item.id}" type="button">${navIcon(item.id)}<span>${item.label}</span></button>`).join("")}</nav>
     </div>
   </div>`;
 }
