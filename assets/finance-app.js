@@ -228,6 +228,8 @@ function dashboardView(metrics, insights) {
             <button class="btn btn-secondary" data-action="openAdd" data-type="income" type="button">Agregar ingreso</button>
           </div>
         </article>
+        ${chartCard(metrics)}
+        ${recentTransactions(metrics.recentTransactions)}
         <div class="grid metrics-grid">
           ${metricCard("Disponible", metrics.availableUntilMonthEndARS)}
           ${metricCard("Gastos", metrics.expenseARS)}
@@ -240,14 +242,11 @@ function dashboardView(metrics, insights) {
         </div>
         ${monthlyGoalsDashboardCard(metrics)}
         ${isZeroState ? zeroStartPanel() : ""}
-        ${chartCard(metrics)}
       </div>
       <aside class="section-stack">
-        ${dollarWidget()}
         ${creditCardDashboardCard(metrics)}
         ${insightFeatured(metrics.hasCurrentData ? insights[0] : "Sin datos suficientes. Configura tu mes o carga tu primer movimiento.")}
         ${homeServicesNotice(metrics)}
-        ${recentTransactions(metrics.recentTransactions)}
       </aside>
     </div>
   `;
@@ -404,17 +403,21 @@ function actionCard(title, copy, action, type = "") {
 }
 
 function chartCard(metrics) {
-  const rows = metrics.categoryRows.slice(0, 6);
+  const rows = metrics.budgetsWithProgress
+    .filter((budget) => budget.monthlyLimit > 0)
+    .sort((a, b) => b.percentageUsed - a.percentageUsed)
+    .slice(0, 6);
   return `<section class="panel">
     <div class="panel-head">
-      <div><h2>Gastos por categoria</h2><p>${rows.length ? "Las categorias con mayor impacto este mes." : "Cuando cargues movimientos, vas a ver tus metricas aca."}</p></div>
+      <div><h2>Gastos por categoria</h2><p>${rows.length ? "Cuanto llevas gastado contra el objetivo de cada categoria." : "Configura objetivos para ver avance por categoria."}</p></div>
     </div>
     ${rows.length ? `<div class="chart-bars">${rows.map((row) => `
       <div class="chart-row">
-        <div class="row-between"><span>${escapeHtml(row.category)}</span><span class="mono">${moneyARS(row.amountARS)}</span></div>
-        ${segments(row.percentage, row.percentage > 32 ? "bad" : row.percentage > 22 ? "warn" : "neutral")}
+        <div class="row-between"><span>${escapeHtml(row.category)}</span><span class="mono">${moneyARS(row.spent)} de ${moneyARS(toARS(row.monthlyLimit, row.currency, getRate(state.rates, state.settings.defaultExchangeRateType)))}</span></div>
+        ${segments(row.percentageUsed, row.status === "exceeded" ? "bad" : row.status === "near" ? "warn" : "good")}
+        <div class="row-between"><span class="muted">${row.percentageUsed.toFixed(0)}% del objetivo</span><span class="muted">${row.remaining < 0 ? "Excedido" : `Disponible ${moneyARS(row.remaining)}`}</span></div>
       </div>
-    `).join("")}</div>` : emptyState("Agrega tu primer gasto", "Cuando cargues gastos por categoria, vamos a mostrar en que se va la plata.")}
+    `).join("")}</div>` : emptyState("Sin objetivos por categoria", "Configura el mes para ver barras de avance contra tus objetivos.")}
   </section>`;
 }
 
