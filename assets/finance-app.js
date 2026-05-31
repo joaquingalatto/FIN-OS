@@ -1,12 +1,14 @@
 import {
   CATEGORIES,
   EXCHANGE_RATE_TYPES,
+  FOOD_SUBCATEGORIES,
   PAYMENT_METHODS,
+  defaultCreditCardSettings,
   emptySavings,
   fallbackExchangeRates,
   mockSettings,
 } from "./finance-data.js";
-import { calculateMetrics, generateInsights, generateMonthlyClosing } from "./finance-calculations.js";
+import { calculateMetrics, generateCreditCardInsights, generateInsights, generateMonthlyClosing } from "./finance-calculations.js";
 import { convertFromARS, formatDate, formatMoney, formatPercent, getRate, movementToARS, toARS } from "./finance-currency.js";
 import { fetchExchangeRates, isRateStale, storage } from "./finance-services.js";
 
@@ -17,6 +19,7 @@ const NAV = [
   { id: "expenses", label: "Gastos", mobile: true },
   { id: "income", label: "Ingresos" },
   { id: "recurring", label: "Recurrentes" },
+  { id: "credit-card", label: "Tarjeta" },
   { id: "savings", label: "Ahorros" },
   { id: "investments", label: "Inversiones" },
   { id: "budgets", label: "Presupuestos", short: "Presup.", mobile: true },
@@ -53,6 +56,8 @@ let state = {
   savings: emptySavings,
   investments: [],
   recurringExpenses: [],
+  installmentPurchases: [],
+  creditCardSettings: defaultCreditCardSettings,
 };
 
 function hydrate() {
@@ -61,6 +66,10 @@ function hydrate() {
     state = {
       ...state,
       ...saved,
+      settings: { ...mockSettings, ...(saved.settings || {}) },
+      savings: { ...emptySavings, ...(saved.savings || {}) },
+      creditCardSettings: { ...defaultCreditCardSettings, ...(saved.creditCardSettings || {}) },
+      installmentPurchases: saved.installmentPurchases || [],
       rates: fallbackExchangeRates,
       ratesStatus: "loading",
       ratesMessage: "Cotizacion en carga",
@@ -165,6 +174,7 @@ function topbarTitle(metrics) {
   if (state.activeView === "dashboard") return moneyARS(metrics.availableUntilMonthEndARS);
   if (state.activeView === "expenses") return moneyARS(metrics.expenseARS);
   if (state.activeView === "income") return moneyARS(metrics.incomeARS);
+  if (state.activeView === "credit-card") return moneyARS(metrics.creditCardSummary.estimatedStatementTotal);
   if (state.activeView === "savings") return moneyARS(metrics.savingARS || state.savings.ars);
   if (state.activeView === "investments") return moneyARS(metrics.totalInvestedARS);
   return "Finanzas personales";
@@ -180,12 +190,14 @@ function mobileNavButton(item) {
 
 function renderViews(metrics) {
   const insights = generateInsights(metrics, state.settings, state.rates);
+  const creditCardInsights = generateCreditCardInsights(metrics, state.settings, state.rates);
   const closing = generateMonthlyClosing(metrics, state.settings, state.rates);
   return [
     view("dashboard", dashboardView(metrics, insights)),
     view("expenses", transactionsView("expense", metrics)),
     view("income", transactionsView("income", metrics)),
     view("recurring", recurringView(metrics)),
+    view("credit-card", creditCardView(metrics, creditCardInsights)),
     view("savings", savingsView(metrics)),
     view("investments", investmentsView(metrics)),
     view("budgets", budgetsView(metrics)),
@@ -234,12 +246,27 @@ function dashboardView(metrics, insights) {
       </div>
       <aside class="section-stack">
         ${dollarWidget()}
+        ${creditCardDashboardCard(metrics)}
         ${insightFeatured(metrics.hasCurrentData ? insights[0] : "Sin datos suficientes. Configura tu mes o carga tu primer movimiento.")}
         ${homeServicesNotice(metrics)}
         ${recentTransactions(metrics.recentTransactions)}
       </aside>
     </div>
   `;
+}
+
+function creditCardDashboardCard(metrics) {
+  const summary = metrics.creditCardSummary;
+  return `<section class="insight-card">
+    <div class="row-between"><span class="label">Resumen de tarjeta</span><span class="chip"><span class="dot ${summary.statusTone}"></span>${escapeHtml(summary.statusLabel)}</span></div>
+    <strong class="value mono">${moneyARS(summary.estimatedStatementTotal)}</strong>
+    ${segments(summary.usagePercentage, summary.statusTone)}
+    <div class="line-list">
+      <div class="line-item"><span>Limite personal</span><strong class="mono">${moneyARS(summary.personalLimit)}</strong></div>
+      <div class="line-item"><span>Disponible</span><strong class="mono ${summary.remainingAvailable < 0 ? "status-bad" : ""}">${moneyARS(summary.remainingAvailable)}</strong></div>
+    </div>
+    <button class="btn btn-secondary" data-view="credit-card" type="button">Ver resumen de tarjeta</button>
+  </section>`;
 }
 
 function metricCard(label, amountARS, className = "") {
@@ -410,13 +437,61 @@ function recurringCard(item) {
 function installmentCard(item) {
   const current = Number(item.installmentCurrent || 1);
   const total = Number(item.installmentTotal || 1);
-  const remaining = Math.max(total - current, 0);
+  const remaining = Number(item.installmentsRemaining ?? Math.max(total - current, 0));
   return `<article class="recurring-card">
     <div class="row-between"><span class="label">Cuota</span><span class="chip">${current}/${total}</span></div>
-    <strong class="transaction-title">${escapeHtml(item.installmentName || item.description || "Compra en cuotas")}</strong>
-    <div class="row-between"><span class="muted">Monto mensual</span><strong class="mono">${moneyARS(movementToARS(item))}</strong></div>
+    <strong class="transaction-title">${escapeHtml(item.description || "Compra en cuotas")}</strong>
+    <div class="row-between"><span class="muted">Monto mensual</span><strong class="mono">${moneyARS(item.amountARS || movementToARS(item))}</strong></div>
     <div class="row-between"><span class="muted">Restantes</span><span class="mono">${remaining}</span></div>
   </article>`;
+}
+
+function creditCardView(metrics, insights) {
+  const summary = metrics.creditCardSummary;
+  return `<div class="section-stack">
+    <div class="grid metrics-grid">
+      ${metricCard("Resumen estimado", summary.estimatedStatementTotal)}
+      ${metricCard("Cuotas comprometidas", summary.committedInstallmentsTotal)}
+      ${metricCard("Consumos nuevos", summary.newCreditCardPurchasesTotal)}
+      <article class="stat-card"><span class="label">Uso del limite</span><strong class="value">${summary.usagePercentage.toFixed(0)}%</strong><span class="hint">${escapeHtml(summary.statusLabel)}</span></article>
+    </div>
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>Resumen de tarjeta</h2><p>Control mensual flexible para no pasarte de tu limite personal.</p></div>
+        <span class="chip"><span class="dot ${summary.statusTone}"></span>${escapeHtml(summary.statusLabel)}</span>
+      </div>
+      <div class="grid two-grid">
+        <article class="insight-card">
+          <span class="label">${summary.isLimitConfigured ? "Limite personal mensual" : "Limite sugerido mensual"}</span>
+          <strong class="value mono">${moneyARS(summary.personalLimit)}</strong>
+          ${segments(summary.usagePercentage, summary.statusTone)}
+          <div class="row-between"><span class="muted">Disponible restante</span><span class="mono ${summary.remainingAvailable < 0 ? "status-bad" : ""}">${moneyARS(summary.remainingAvailable)}</span></div>
+        </article>
+        <form class="insight-card" id="credit-card-settings-form">
+          <span class="label">Editar limite</span>
+          <div class="field">
+            <label for="cardLimit">Limite personal ARS</label>
+            <input id="cardLimit" name="monthlyPersonalLimit" type="number" inputmode="decimal" min="0" step="0.01" value="${Number(state.creditCardSettings.monthlyPersonalLimit || 500000)}" required>
+          </div>
+          <button class="btn btn-secondary" type="submit">Guardar limite</button>
+        </form>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><div><h2>Cuotas comprometidas</h2><p>Compras anteriores que impactan en el resumen actual.</p></div></div>
+      <div class="grid two-grid">
+        ${summary.committedInstallments.length ? summary.committedInstallments.map(installmentCard).join("") : emptyState("Sin cuotas comprometidas", "Cuando cargues cuotas, vamos a mostrar tus compromisos mensuales.")}
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><div><h2>Consumos nuevos con tarjeta</h2><p>Compras del mes pagadas con tarjeta de credito.</p></div></div>
+      ${summary.newCreditCardPurchases.length ? transactionList(summary.newCreditCardPurchases) : emptyState("Sin consumos con tarjeta", "Cuando cargues consumos con tarjeta, vas a ver tu resumen aca.")}
+    </section>
+    <section class="panel">
+      <div class="panel-head"><div><h2>Insights de tarjeta</h2><p>Solo se muestran recomendaciones cuando hay datos suficientes.</p></div></div>
+      <div class="grid two-grid">${insights.map((text) => `<article class="insight-card"><strong>${escapeHtml(text)}</strong></article>`).join("")}</div>
+    </section>
+  </div>`;
 }
 
 function savingsView(metrics) {
@@ -570,6 +645,7 @@ function settingsView() {
         <article class="insight-card"><span class="label">Visualizacion</span><strong>${state.settings.displayCurrency}</strong><p class="muted">El toggle global cambia todos los valores calculados.</p></article>
         <article class="insight-card"><span class="label">Cotizacion default</span><strong>${state.rates[state.settings.defaultExchangeRateType].label}</strong><p class="muted">La arquitectura soporta oficial, blue y MEP.</p></article>
         <article class="insight-card"><span class="label">Tasa historica</span><strong>${state.settings.useSavedRateForHistory ? "Usar guardada" : "Usar actual"}</strong><p class="muted">Cada movimiento conserva moneda original y tipo de cambio.</p></article>
+        <article class="insight-card"><span class="label">Limite tarjeta</span><strong>${moneyARS(state.creditCardSettings.monthlyPersonalLimit || 500000)}</strong><p class="muted">Regla personal editable desde Resumen de tarjeta.</p></article>
         <article class="insight-card"><span class="label">API</span><strong>DolarApi</strong><p class="muted">Si falla, se muestra error y se usa fallback local.</p></article>
       </div>
     </section>
@@ -589,6 +665,10 @@ function emptyState(title, copy) {
 
 function errorState(title, copy) {
   return `<div class="error-state"><span class="label">[ERROR] ${escapeHtml(title)}</span><p>${escapeHtml(copy)}</p></div>`;
+}
+
+function isCreditCardPayment(method) {
+  return method === "Tarjeta de credito" || method === "Credito";
 }
 
 function setupModal() {
@@ -635,6 +715,7 @@ function addModal() {
           <div class="field"><label for="type">Tipo</label><select id="type" name="type">${optionList([{ value: "expense", label: "Gasto" }, { value: "income", label: "Ingreso" }, { value: "saving", label: "Ahorro" }, { value: "investment", label: "Inversion" }], state.modalType)}</select></div>
           <div class="field"><label for="currency">Moneda</label><select id="currency" name="currency">${optionList(["ARS", "USD"], "ARS")}</select></div>
           <div class="field"><label for="category">Categoria</label><select id="category" name="category">${optionList(CATEGORIES, "Ocio")}</select></div>
+          <div class="field"><label for="subcategory">Subcategoria</label><select id="subcategory" name="subcategory"><option value="">Sin subcategoria</option>${optionList(FOOD_SUBCATEGORIES, "")}</select></div>
           <div class="field"><label for="date">Fecha</label><input id="date" name="date" type="date" value="${new Date().toISOString().slice(0, 10)}" required></div>
           <div class="field"><label for="paymentMethod">Metodo</label><select id="paymentMethod" name="paymentMethod"><option value="">Sin metodo</option>${optionList(PAYMENT_METHODS, "")}</select></div>
           <div class="field full"><label for="description">Descripcion opcional</label><textarea id="description" name="description" placeholder="Ej: cena, supermercado, cuota"></textarea></div>
@@ -642,14 +723,14 @@ function addModal() {
         <div class="switch-row">
           <label class="check-pill"><input type="checkbox" name="isFixed"> Gasto fijo</label>
           <label class="check-pill"><input type="checkbox" name="isRecurring"> Recurrente</label>
-          <label class="check-pill"><input type="checkbox" name="isInstallment"> Es cuota</label>
         </div>
         <div class="panel nested-panel">
-          <div class="panel-head"><div><h3>Cuotas</h3><p>Completa esto si estas pagando una compra en cuotas.</p></div></div>
+          <div class="panel-head"><div><h3>Tarjeta de credito</h3><p>Si el metodo es tarjeta de credito, separa consumo nuevo o compra en cuotas.</p></div></div>
           <div class="form-grid">
-            <div class="field full"><label for="installmentName">Compra</label><input id="installmentName" name="installmentName" type="text" placeholder="Ej: heladera, tarjeta, curso"></div>
-            <div class="field"><label for="installmentCurrent">Cuota actual</label><input id="installmentCurrent" name="installmentCurrent" type="number" inputmode="numeric" min="1" step="1" placeholder="Ej: 2"></div>
-            <div class="field"><label for="installmentTotal">Total cuotas</label><input id="installmentTotal" name="installmentTotal" type="number" inputmode="numeric" min="1" step="1" placeholder="Ej: 12"></div>
+            <div class="field"><label for="creditInstallments">Es en cuotas</label><select id="creditInstallments" name="creditInstallments">${optionList([{ value: "no", label: "No" }, { value: "yes", label: "Si" }], "no")}</select></div>
+            <div class="field"><label for="purchaseTotalAmount">Monto total compra</label><input id="purchaseTotalAmount" name="purchaseTotalAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Solo si es en cuotas"></div>
+            <div class="field"><label for="totalInstallments">Cantidad de cuotas</label><input id="totalInstallments" name="totalInstallments" type="number" inputmode="numeric" min="1" step="1" placeholder="Solo si es en cuotas"></div>
+            <div class="field"><label for="firstInstallmentMonth">Primer mes</label><input id="firstInstallmentMonth" name="firstInstallmentMonth" type="month" value="${new Date().toISOString().slice(0, 7)}"></div>
           </div>
         </div>
         <div class="inline-status ${state.formStatus.startsWith("[ERROR") ? "is-error" : ""}">${escapeHtml(state.formStatus || `[TIPO DE CAMBIO ${state.rates[state.settings.defaultExchangeRateType].label.toUpperCase()}: ${formatMoney(rate, "ARS")}]`)}</div>
@@ -738,6 +819,10 @@ function handleSubmit(event) {
     handleSetupSubmit(event.target);
     return;
   }
+  if (event.target.id === "credit-card-settings-form") {
+    handleCreditCardSettingsSubmit(event.target);
+    return;
+  }
   const form = event.target;
   const formData = new FormData(form);
   const amount = Number(formData.get("amount"));
@@ -751,6 +836,71 @@ function handleSubmit(event) {
   const currency = formData.get("currency");
   const now = new Date().toISOString();
   const rate = getRate(state.rates, state.settings.defaultExchangeRateType);
+  const category = normalizeCategory(formData.get("category") || "Otros");
+  const paymentMethod = String(formData.get("paymentMethod") || "");
+  const isCreditCard = isCreditCardPayment(paymentMethod);
+  const isInstallmentPurchase = type === "expense" && isCreditCard && formData.get("creditInstallments") === "yes";
+  const description = String(formData.get("description") || "").trim();
+  const subcategory = String(formData.get("subcategory") || "").trim();
+
+  if (isInstallmentPurchase) {
+    const totalAmount = Number(formData.get("purchaseTotalAmount")) || amount;
+    const totalInstallments = readPositiveInteger(formData.get("totalInstallments"), 1);
+    const installmentAmount = totalAmount / totalInstallments;
+    const firstInstallmentMonth = String(formData.get("firstInstallmentMonth") || monthKeyFromDate(formData.get("date")));
+    const purchaseId = `ip-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
+    const purchase = {
+      id: purchaseId,
+      totalAmount,
+      currency,
+      exchangeRate: rate,
+      exchangeRateType: state.settings.defaultExchangeRateType,
+      category,
+      subcategory,
+      description,
+      paymentMethod,
+      totalInstallments,
+      installmentAmount,
+      firstInstallmentMonth,
+      installmentsPaid: 0,
+      installmentsRemaining: totalInstallments,
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+    };
+    const installmentTransactions = Array.from({ length: totalInstallments }, (_, index) => ({
+      id: `tx-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}-${index + 1}`,
+      type,
+      amount: installmentAmount,
+      currency,
+      exchangeRate: rate,
+      exchangeRateType: state.settings.defaultExchangeRateType,
+      category,
+      subcategory,
+      description: description || "Compra en cuotas",
+      date: dateFromMonthKey(addMonthsToKey(firstInstallmentMonth, index)),
+      paymentMethod,
+      isFixed: formData.get("isFixed") === "on",
+      isRecurring: false,
+      isCreditCard: true,
+      isInstallment: true,
+      installmentPurchaseId: purchaseId,
+      installmentCurrent: index + 1,
+      installmentTotal: totalInstallments,
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+    state.installmentPurchases = [purchase, ...state.installmentPurchases];
+    state.transactions = [...installmentTransactions, ...state.transactions];
+    state.formStatus = "[SAVED]";
+    state.modalOpen = false;
+    state.activeView = "credit-card";
+    persist();
+    render();
+    return;
+  }
+
   const item = {
     id: `tx-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`,
     type,
@@ -758,16 +908,16 @@ function handleSubmit(event) {
     currency,
     exchangeRate: rate,
     exchangeRateType: state.settings.defaultExchangeRateType,
-    category: String(formData.get("category") || "Otros").replace(/oseo/gi, "Ocio"),
-    description: String(formData.get("description") || "").trim(),
+    category,
+    subcategory,
+    description,
     date: formData.get("date"),
-    paymentMethod: formData.get("paymentMethod"),
+    paymentMethod,
     isFixed: formData.get("isFixed") === "on",
     isRecurring: formData.get("isRecurring") === "on",
-    isInstallment: formData.get("isInstallment") === "on",
-    installmentName: String(formData.get("installmentName") || "").trim(),
-    installmentCurrent: readPositiveInteger(formData.get("installmentCurrent"), 1),
-    installmentTotal: readPositiveInteger(formData.get("installmentTotal"), 1),
+    isCreditCard,
+    isInstallment: false,
+    installmentPurchaseId: "",
     createdAt: now,
     updatedAt: now,
   };
@@ -795,12 +945,6 @@ function handleSubmit(event) {
     }, ...state.investments];
   }
 
-  if (item.isInstallment && item.type === "expense") {
-    item.category = "Cuotas";
-    item.isFixed = true;
-    item.isRecurring = true;
-  }
-
   if (item.isRecurring && item.type === "expense") {
     state.recurringExpenses = [{
       id: `rec-${Date.now()}`,
@@ -819,7 +963,7 @@ function handleSubmit(event) {
 
   state.formStatus = "[SAVED]";
   state.modalOpen = false;
-  state.activeView = type === "income" ? "income" : type === "expense" ? "expenses" : type === "saving" ? "savings" : "investments";
+  state.activeView = item.isCreditCard ? "credit-card" : type === "income" ? "income" : type === "expense" ? "expenses" : type === "saving" ? "savings" : "investments";
   persist();
   render();
 }
@@ -832,6 +976,50 @@ function readAmount(formData, key) {
 function readPositiveInteger(value, fallback = 1) {
   const number = Number.parseInt(value, 10);
   return Number.isFinite(number) && number > 0 ? number : fallback;
+}
+
+function normalizeCategory(value) {
+  return String(value || "Otros").replace(/oseo/gi, "Ocio");
+}
+
+function monthKeyFromDate(value) {
+  return String(value || new Date().toISOString()).slice(0, 7);
+}
+
+function monthToIndex(monthKey) {
+  const [year, month] = String(monthKey || monthKeyFromDate()).split("-").map(Number);
+  return year * 12 + month - 1;
+}
+
+function addMonthsToKey(monthKey, offset) {
+  const index = monthToIndex(monthKey) + offset;
+  const year = Math.floor(index / 12);
+  const month = (index % 12) + 1;
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function dateFromMonthKey(monthKey) {
+  return `${monthKey}-01`;
+}
+
+function handleCreditCardSettingsSubmit(form) {
+  const formData = new FormData(form);
+  const monthlyPersonalLimit = Number(formData.get("monthlyPersonalLimit"));
+  if (!Number.isFinite(monthlyPersonalLimit) || monthlyPersonalLimit <= 0) {
+    state.formStatus = "[ERROR] Ingresa un limite valido.";
+    render();
+    return;
+  }
+  state.creditCardSettings = {
+    ...state.creditCardSettings,
+    monthlyPersonalLimit,
+    currency: "ARS",
+    month: monthKeyFromDate(),
+    warningThreshold: 70,
+    dangerThreshold: 90,
+  };
+  persist();
+  render();
 }
 
 function makeTransaction({ type, amount, category, description, isFixed = false, isRecurring = false }) {
@@ -850,6 +1038,9 @@ function makeTransaction({ type, amount, category, description, isFixed = false,
     paymentMethod: "Transferencia",
     isFixed,
     isRecurring,
+    isCreditCard: false,
+    isInstallment: false,
+    installmentPurchaseId: "",
     createdAt: now,
     updatedAt: now,
   };
@@ -981,7 +1172,7 @@ function bindEvents(root) {
   });
 
   root.addEventListener("submit", (event) => {
-    if (event.target.id === "transaction-form" || event.target.id === "setup-form") handleSubmit(event);
+    if (["transaction-form", "setup-form", "credit-card-settings-form"].includes(event.target.id)) handleSubmit(event);
   });
 
   root.addEventListener("click", (event) => {

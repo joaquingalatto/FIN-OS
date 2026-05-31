@@ -32,7 +32,10 @@ No muestra gastos, ingresos, presupuestos ni inversiones ficticias como estado i
 - Dashboard responsive.
 - Flujo de configuracion mensual con sueldo, alquiler, expensas y servicios.
 - Registro rapido de gastos, ingresos, ahorros e inversiones.
-- Registro de compras en cuotas.
+- Resumen de tarjeta con limite personal editable.
+- Registro de compras en cuotas con impacto mensual por cuota.
+- Separacion entre cuotas comprometidas y consumos nuevos con tarjeta.
+- Subcategorias de comida para diferenciar supermercado grande, diario, delivery y otros.
 - Categorias y gastos recurrentes.
 - Presupuestos variables.
 - Objetivo de ahorro automatico del 40% del sueldo mensual.

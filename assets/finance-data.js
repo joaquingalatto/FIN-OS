@@ -10,6 +10,8 @@ export const CATEGORIES = [
   "Casa y servicios",
   "Alquiler",
   "Expensas",
+  "Internet",
+  "Otros gastos del hogar",
   "Mantenimiento de casa",
   "Comida / Supermercado",
   "Ocio",
@@ -23,6 +25,14 @@ export const CATEGORIES = [
   "Otros",
 ];
 
+export const FOOD_SUBCATEGORIES = [
+  "Supermercado diario",
+  "Supermercado grande",
+  "Delivery / comida afuera",
+  "Kiosco / almacen",
+  "Otros",
+];
+
 export const HOME_SERVICE_CATEGORIES = [
   "Casa y servicios",
   "Alquiler",
@@ -33,7 +43,23 @@ export const HOME_SERVICE_CATEGORIES = [
   "Otros gastos del hogar",
 ];
 
-export const PAYMENT_METHODS = ["Debito", "Credito", "Efectivo", "Transferencia", "Cuenta USD"];
+export const PAYMENT_METHODS = [
+  "Efectivo",
+  "Debito",
+  "Transferencia",
+  "Tarjeta de credito",
+  "Tarjeta de debito",
+  "Mercado Pago",
+  "Otro",
+];
+
+export const defaultCreditCardSettings = {
+  monthlyPersonalLimit: 500000,
+  currency: "ARS",
+  month: "",
+  warningThreshold: 70,
+  dangerThreshold: 90,
+};
 
 export const mockSettings = {
   displayCurrency: "ARS",

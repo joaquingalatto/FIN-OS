@@ -2,6 +2,7 @@
   "name": "fin-os",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Web app responsive para manejar finanzas personales desde cero cada mes.",
   "scripts": {
     "start": "node dev-server.cjs",

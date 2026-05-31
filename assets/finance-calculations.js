@@ -21,11 +21,93 @@ function sumARS(items) {
   return items.reduce((sum, item) => sum + movementToARS(item), 0);
 }
 
+function monthToIndex(monthKey) {
+  const [year, month] = String(monthKey || currentMonthKey()).split("-").map(Number);
+  return year * 12 + month - 1;
+}
+
+function installmentNumberForMonth(purchase, monthKey) {
+  const start = monthToIndex(purchase.firstInstallmentMonth);
+  const current = monthToIndex(monthKey);
+  const installmentNumber = current - start + 1;
+  const total = Number(purchase.totalInstallments || 0);
+  return installmentNumber >= 1 && installmentNumber <= total ? installmentNumber : 0;
+}
+
+function enrichInstallmentPurchase(purchase, monthKey) {
+  const totalInstallments = Number(purchase.totalInstallments || 1);
+  const installmentAmount = Number(purchase.installmentAmount || 0);
+  const currentInstallment = installmentNumberForMonth(purchase, monthKey);
+  const monthsElapsedBeforeCurrent = Math.max(monthToIndex(monthKey) - monthToIndex(purchase.firstInstallmentMonth), 0);
+  const installmentsPaid = Math.min(monthsElapsedBeforeCurrent, totalInstallments);
+  const installmentsRemaining = Math.max(totalInstallments - installmentsPaid, 0);
+  const amountARS = toARS(installmentAmount, purchase.currency, purchase.exchangeRate);
+  return {
+    ...purchase,
+    currentInstallment,
+    installmentCurrent: currentInstallment || Math.min(installmentsPaid + 1, totalInstallments),
+    installmentTotal: totalInstallments,
+    installmentsPaid,
+    installmentsRemaining,
+    amountARS,
+    futureCommittedARS: amountARS * installmentsRemaining,
+  };
+}
+
+function creditCardStatus(usagePercentage, settings = {}) {
+  const dangerThreshold = settings.dangerThreshold || 90;
+  if (usagePercentage > 100) return { id: "exceeded", label: "Limite personal superado", tone: "bad" };
+  if (usagePercentage >= dangerThreshold) return { id: "very-near", label: "Muy cerca del limite", tone: "bad" };
+  if (usagePercentage >= (settings.warningThreshold || 70)) return { id: "near", label: "Cerca del limite", tone: "warn" };
+  return { id: "within", label: "Dentro del limite", tone: "good" };
+}
+
+function isCreditCardPayment(method) {
+  return method === "Tarjeta de credito" || method === "Credito";
+}
+
+function calculateCreditCardSummary({ expenses, installmentPurchases = [], rates, settings, creditCardSettings = {}, monthKey }) {
+  const rate = rates[settings.defaultExchangeRateType]?.sell || 1;
+  const personalLimit = toARS(creditCardSettings.monthlyPersonalLimit || 500000, creditCardSettings.currency || "ARS", rate);
+  const activeInstallments = installmentPurchases
+    .filter((item) => item.status !== "cancelled")
+    .map((item) => enrichInstallmentPurchase(item, monthKey))
+    .filter((item) => item.installmentsRemaining > 0 || item.currentInstallment > 0)
+    .sort((a, b) => String(a.firstInstallmentMonth).localeCompare(String(b.firstInstallmentMonth)));
+  const committedInstallments = activeInstallments.filter((item) => item.currentInstallment > 0);
+  const committedInstallmentsTotal = committedInstallments.reduce((sum, item) => sum + item.amountARS, 0);
+  const newCreditCardPurchases = expenses.filter((item) => (item.isCreditCard || isCreditCardPayment(item.paymentMethod)) && !item.isInstallment);
+  const newCreditCardPurchasesTotal = sumARS(newCreditCardPurchases);
+  const estimatedStatementTotal = committedInstallmentsTotal + newCreditCardPurchasesTotal;
+  const remainingAvailable = personalLimit - estimatedStatementTotal;
+  const usagePercentage = personalLimit ? (estimatedStatementTotal / personalLimit) * 100 : 0;
+  const status = creditCardStatus(usagePercentage, creditCardSettings);
+
+  return {
+    month: monthKey,
+    personalLimit,
+    committedInstallmentsTotal,
+    newCreditCardPurchasesTotal,
+    estimatedStatementTotal,
+    remainingAvailable,
+    usagePercentage,
+    status: status.id,
+    statusLabel: status.label,
+    statusTone: status.tone,
+    committedInstallments,
+    activeInstallments,
+    newCreditCardPurchases,
+    hasCreditCardData: committedInstallments.length > 0 || newCreditCardPurchases.length > 0,
+    isLimitConfigured: Boolean(creditCardSettings.month),
+    futureCommittedTotal: activeInstallments.reduce((sum, item) => sum + item.futureCommittedARS, 0),
+  };
+}
+
 export function getMonthlyTransactions(transactions, key = currentMonthKey()) {
   return transactions.filter((item) => isInMonth(item, key));
 }
 
-export function calculateMetrics({ transactions, budgets, recurringExpenses, savings, investments, rates, settings }) {
+export function calculateMetrics({ transactions, budgets, recurringExpenses, savings, investments, rates, settings, creditCardSettings, installmentPurchases }) {
   const monthKey = currentMonthKey();
   const previousKey = previousMonthKey();
   const monthTransactions = getMonthlyTransactions(transactions, monthKey);
@@ -96,9 +178,15 @@ export function calculateMetrics({ transactions, budgets, recurringExpenses, sav
 
   const activeRecurring = recurringExpenses.filter((item) => item.status === "active");
   const fixedMonthlyARS = activeRecurring.reduce((sum, item) => sum + toARS(item.amount, item.currency, item.exchangeRate), 0);
-  const activeInstallments = transactions
-    .filter((item) => item.type === "expense" && item.isInstallment && Number(item.installmentCurrent || 0) < Number(item.installmentTotal || 0))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const creditCardSummary = calculateCreditCardSummary({
+    expenses,
+    installmentPurchases,
+    rates,
+    settings,
+    creditCardSettings,
+    monthKey,
+  });
+  const activeInstallments = creditCardSummary.activeInstallments;
   const homeServicesARS = expenses
     .filter((item) => HOME_SERVICE_CATEGORIES.includes(item.category))
     .reduce((sum, item) => sum + movementToARS(item), 0);
@@ -136,6 +224,7 @@ export function calculateMetrics({ transactions, budgets, recurringExpenses, sav
     categoryRows,
     categoryGrowth,
     budgetsWithProgress,
+    creditCardSummary,
     activeInstallments,
     recurringActive: activeRecurring,
     recurringPaused: recurringExpenses.filter((item) => item.status === "paused"),
@@ -147,6 +236,43 @@ export function calculateMetrics({ transactions, budgets, recurringExpenses, sav
       homeServices: incomeARS ? ((homeServicesARS || recurringHomeServicesARS) / incomeARS) * 100 : 0,
     },
   };
+}
+
+export function generateCreditCardInsights(metrics, settings, rates) {
+  const summary = metrics.creditCardSummary;
+  if (!summary?.hasCreditCardData) {
+    return [
+      summary?.isLimitConfigured ? "Cuando cargues consumos con tarjeta, vas a ver tu resumen aca." : "Todavia no configuraste tu limite personal de tarjeta.",
+      "Cuando cargues cuotas, vamos a mostrar tus compromisos mensuales.",
+    ];
+  }
+
+  const currency = settings.displayCurrency;
+  const rateType = settings.defaultExchangeRateType;
+  const estimated = formatMoney(convertFromARS(summary.estimatedStatementTotal, currency, rates, rateType), currency);
+  const remaining = formatMoney(convertFromARS(summary.remainingAvailable, currency, rates, rateType), currency);
+  const committed = formatMoney(convertFromARS(summary.committedInstallmentsTotal, currency, rates, rateType), currency);
+  const cardFood = summary.newCreditCardPurchases
+    .filter((item) => item.category === "Comida / Supermercado" || item.subcategory === "Supermercado grande")
+    .reduce((sum, item) => sum + movementToARS(item), 0);
+  const cardFoodIsMain = cardFood > 0 && cardFood >= summary.newCreditCardPurchasesTotal * 0.5;
+
+  return [
+    `Tu resumen estimado de tarjeta es de ${estimated}.`,
+    `Te quedan ${remaining} disponibles para mantenerte dentro de tu limite personal.`,
+    summary.committedInstallmentsTotal > 0
+      ? `Las cuotas comprometidas representan ${committed} de tu resumen.`
+      : "Todavia no cargaste cuotas comprometidas para este mes.",
+    cardFoodIsMain
+      ? "Supermercado representa la mayor parte de tus consumos con tarjeta este mes."
+      : "Cuando supermercado concentre tus consumos con tarjeta, lo vas a ver destacado aca.",
+    summary.status === "within"
+      ? "Tu resumen de tarjeta sigue dentro del limite personal configurado."
+      : "Tu resumen de tarjeta esta cerca del limite personal configurado.",
+    summary.committedInstallmentsTotal > 0
+      ? "Las cuotas ya comprometidas reducen tu disponible del mes."
+      : "Las compras en cuotas se van a separar de los consumos nuevos.",
+  ];
 }
 
 export function generateInsights(metrics, settings, rates) {
